@@ -1,0 +1,17 @@
+__pycache__/
+env/
+.venv/
+venv/
+test*
+
+# Configurações de ambiente local
+.env
+
+# Banco de dados SQLite local
+*.db
+*.db-wal
+*.db-shm
+
+# Backups e arquivos temporários
+*.bak
+*.json.bak

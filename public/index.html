@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeclarAtivo - Controle de IR</title>
+    <meta name="description"
+        content="Dashboard profissional para gestão de preço médio e declaração de imposto de renda sobre investimentos.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    <header class="main-header">
+        <div id="system-status" class="status-badge status-healthy">
+            <span class="status-dot"></span> <span id="status-text">Sistema OK</span>
+        </div>
+
+        <div class="header-actions" style="display: flex; gap: 0.75rem; align-items: center;">
+            <button onclick="openModal('modal-operation')" class="submit-btn"
+                style="padding: 0.5rem 1rem; width: auto; font-weight: 600;">
+                💸 Nova Operação
+            </button>
+            <button onclick="openAssetManager()" class="menu-btn secondary-btn"
+                style="padding: 0.5rem 0.8rem; width: auto; margin: 0; font-size: 0.75rem;">
+                🏷️ Gerenciar Ativos
+            </button>
+            <button onclick="openModal('modal-event')" class="menu-btn secondary-btn"
+                style="padding: 0.5rem 0.8rem; width: auto; margin: 0; font-size: 0.75rem;">
+                🔄 Desdobramento / Grupamento
+            </button>
+            <button onclick="openSwapModal()" class="menu-btn secondary-btn"
+                style="padding: 0.5rem 0.8rem; width: auto; margin: 0; font-size: 0.75rem;">
+                💱 Troca de Cripto (Swap)
+            </button>
+
+            <button onclick="openThemeManager()" class="action-icon-btn" title="Temática"
+                style="background: none; border: 1px solid var(--border); border-radius: 8px; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-primary); transition: 0.2s;">
+                🎨
+            </button>
+
+            <button onclick="logout()" class="logout-btn" title="Sair" id="btn-logout" style="display: none;">
+                🚪
+            </button>
+
+            <div class="notification-bell" id="bell-icon" onclick="openNotifications()"
+                style="cursor: pointer; position: relative; font-size: 1.2rem; margin-left: 0.5rem;">
+                🔔 <span id="notif-count" class="notif-badge"
+                    style="display: none; position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; padding: 2px 5px; font-size: 0.6rem; font-weight: bold;">0</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Floating Modals -->
+        <div id="modal-operation" class="modal-window">
+            <div class="modal-header">
+                <span class="modal-title">💸 Nova Operação de Compra/Venda</span>
+                <button class="close-btn" onclick="closeModal('modal-operation')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="operation-form">
+                    <input type="hidden" name="id">
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label>Ativo</label>
+                            <select name="ticker" class="ticker-select" required>
+                                <option value="">Selecione um ativo...</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 1.5;">
+                            <label>Ordem</label>
+                            <select name="action">
+                                <option value="Comprar">Compra</option>
+                                <option value="Vender">Venda</option>
+                                <option value="Recompensa">Recompensa</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label>Data</label>
+                            <input type="date" name="date" required>
+                        </div>
+                        <div class="form-group" style="flex: 1.5;">
+                            <label>Quant.</label>
+                            <input type="number" name="quantity" step="any" placeholder="0.00" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Preço Unitário</label>
+                            <input type="text" name="price" id="op-price" placeholder="R$ 0,00" class="currency-input"
+                                required>
+                        </div>
+                        <div class="form-group">
+                            <label>Valor Total</label>
+                            <input type="text" id="op-total" placeholder="R$ 0,00" class="currency-input">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Taxas</label>
+                            <input type="text" name="taxes" placeholder="R$ 0,00" class="currency-input"
+                                value="R$ 0,00">
+                        </div>
+                    </div>
+                    <button type="submit" class="submit-btn" style="margin-top: 0.5rem;">Registrar Operação</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="modal-event" class="modal-window">
+            <div class="modal-header">
+                <span class="modal-title">🔄 Desdobramento / Grupamento</span>
+                <button class="close-btn" onclick="closeModal('modal-event')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="event-form">
+                    <input type="hidden" name="id">
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label>Ativo</label>
+                            <select name="ticker" class="ticker-select" required>
+                                <option value="">Selecione um ativo...</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 1.5;">
+                            <label>Tipo Evento</label>
+                            <select name="action" id="event-action-select" onchange="toggleEventFields()">
+                                <option value="Desdobramento">Desdobrar (Split)</option>
+                                <option value="Grupamento">Agrupar (Inverso)</option>
+                                <option value="Incorporacao">Incorporação (Fusão)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row" id="dest-ticker-row" style="display: none;">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Ativo de Destino</label>
+                            <select name="ticker_destino" class="ticker-select">
+                                <option value="">Selecione o destino...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label>Data do Evento</label>
+                            <input type="date" name="date" required>
+                        </div>
+                        <div class="form-group" style="flex: 1.5;">
+                            <label id="factor-label">Fator (Ratio)</label>
+                            <input type="number" name="quantity" id="event-factor-input" step="any"
+                                placeholder="ex: 1.0" required>
+                        </div>
+                    </div>
+                    <p class="form-hint" id="event-hint">* Neste evento não há fluxo financeiro direto. No caso de
+                        incorporação, o saldo do ativo de origem será zerado.</p>
+                    <button type="submit" class="submit-btn" style="margin-top: 0.5rem;">Aplicar Evento</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal: Troca de Cripto (Swap) -->
+        <div id="modal-swap" class="modal-window" style="max-width: 500px;">
+            <div class="modal-header">
+                <span class="modal-title">💱 Troca de Cripto (Swap)</span>
+                <button class="close-btn" onclick="closeModal('modal-swap')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="swap-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Ativo de Origem (Sai)</label>
+                            <select name="ticker_out" class="ticker-select" required>
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantidade</label>
+                            <input type="number" name="qty_out" step="any" placeholder="0.00" required>
+                        </div>
+                    </div>
+                    <div style="text-align: center; margin: 0.5rem 0; font-size: 1.2rem; color: var(--primary);">⬇️
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Ativo de Destino (Entra)</label>
+                            <select name="ticker_in" class="ticker-select" required>
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantidade</label>
+                            <input type="number" name="qty_in" step="any" placeholder="0.00" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Data da Troca</label>
+                            <input type="date" name="date" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Valor Total (R$)</label>
+                            <input type="text" name="total_brl" placeholder="R$ 0,00" class="currency-input" required>
+                        </div>
+                    </div>
+                    <p class="form-hint">* Esta operação registrará uma Venda e uma Compra simultâneas para fins
+                        fiscais.</p>
+                    <button type="submit" class="submit-btn"
+                        style="margin-top: 0.5rem; background: var(--success) !important;">Confirmar Troca</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal: Lista de Ativos -->
+        <div id="modal-ticker-list" class="modal-window" style="max-width: 600px;">
+            <div class="modal-header">
+                <span class="modal-title">🏷️ Gerenciar Ativos (Tickers)</span>
+                <button class="close-btn" onclick="closeModal('modal-ticker-list')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <p class="form-hint" style="margin: 0;">Visualize e gerencie seus tickers cadastrados.</p>
+                    <button type="button" class="menu-btn primary-btn"
+                        style="padding: 0.3rem 0.8rem; font-size: 0.65rem;" onclick="openTickerForm()">+ Novo
+                        Ativo</button>
+                </div>
+                <!-- Ticker List Section -->
+                <div id="ticker-manager-list"
+                    style="max-height: 400px; overflow-y: auto; background: rgba(0,0,0,0.1); border-radius: 8px; padding: 0.5rem; border: 1px solid var(--border);">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Cadastro/Edição de Ativo -->
+        <div id="modal-ticker-form" class="modal-window" style="max-width: 450px; z-index: 1010;">
+            <div class="modal-header">
+                <span id="ticker-modal-title" class="modal-title">➕ Cadastrar Novo Ativo</span>
+                <button class="close-btn" onclick="closeModal('modal-ticker-form')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="ticker-form">
+                    <input type="hidden" name="is_edit" value="false">
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Ticker (Ativo)</label>
+                            <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                                <input type="text" name="ticker" class="ticker-input" placeholder="PETR4" required
+                                    style="flex: 1;">
+                                <button type="button" id="fetch-info-btn" class="action-icon-btn"
+                                    style="padding: 10px; border-radius: 8px; background: var(--secondary); color: white; transition: 0.3s; height: 45px; width: 45px;"
+                                    title="Buscar Info">🔍</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Nome da Empresa</label>
+                            <input type="text" name="name" placeholder="EX: PETROLEO BRASILEIRO S.A.">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Categoria</label>
+                            <select name="category" required>
+                                <option value="Ações">Ações</option>
+                                <option value="FIIs">FIIs</option>
+                                <option value="Cripto">Cripto</option>
+                                <option value="BDRs">BDRs</option>
+                                <option value="Outros">Outros</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label>CNPJ / Identificador</label>
+                            <input type="text" name="cnpj" class="cnpj-input" placeholder="00.000.000/0001-00">
+                        </div>
+                    </div>
+                    <div id="razao-social-info"
+                        style="display:none; padding: 0.4rem 0.6rem; margin-bottom: 0.5rem; border-radius: 0.4rem; background: var(--primary-glow); border: 1px solid var(--border); font-size: 0.6rem; color: var(--text-muted);">
+                        <strong
+                            style="color: var(--primary); font-size: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">Razão
+                            Social</strong><br>
+                        <span id="razao-social-text"></span>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                        <button type="button" class="submit-btn secondary-btn" style="flex: 1;"
+                            onclick="closeModal('modal-ticker-form')">Cancelar</button>
+                        <button type="submit" id="ticker-submit-btn" class="submit-btn" style="flex: 1;">Salvar
+                            Ativo</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="modal-theme" class="modal-window" style="max-width: 500px;">
+            <div class="modal-header">
+                <span class="modal-title">🎨 Configurações Temáticas</span>
+                <button class="close-btn" onclick="closeModal('modal-theme')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="form-hint" style="margin-bottom: 1rem;">Defina o modo de exibição do sistema e as cores das
+                    categorias.</p>
+
+                <div class="theme-toggle"
+                    style="margin-bottom: 1.5rem; padding: 0.5rem; background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border);">
+                    <div class="menu-label" style="margin: 0 0 0.5rem 0;">Modo do Sistema</div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="theme-toggle-btn" style="flex: 1;" onclick="setTheme('light')" title="Claro">☀️
+                            Claro</button>
+                        <button class="theme-toggle-btn" style="flex: 1;" onclick="setTheme('dark')" title="Escuro">🌙
+                            Escuro</button>
+                        <button class="theme-toggle-btn" style="flex: 1;" onclick="setTheme('auto')"
+                            title="Automático">💻 Auto</button>
+                    </div>
+                </div>
+
+                <div class="menu-label" style="margin: 0 0 0.5rem 0;">Cores das Categorias</div>
+                <div id="theme-manager-list" style="max-height: 200px; overflow-y: auto;">
+                    <!-- Populated via JS -->
+                </div>
+                <button type="button" onclick="saveThemeSettings()" class="submit-btn"
+                    style="margin-top: 1.5rem;">Salvar Alterações</button>
+            </div>
+        </div>
+
+        <div id="modal-notifications" class="modal-window" style="max-width: 500px;">
+            <div class="modal-header">
+                <span class="modal-title">🔔 Inconsistências de Dados</span>
+                <button class="close-btn" onclick="closeModal('modal-notifications')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="form-hint" style="margin-bottom: 1rem;">Processamento concluído. Verifique as divergências
+                    encontradas abaixo:</p>
+                <div id="notifications-list" style="max-height: 400px; overflow-y: auto; padding-right: 4px;">
+                    <!-- Populated via JS -->
+                    <div class="empty-state">🎉 Nenhuma inconsistência detectada.</div>
+                </div>
+                <div id="notifications-footer"
+                    style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); display: none;">
+                    <button onclick="checkDataInconsistencies()" class="menu-btn secondary-btn"
+                        style="width: 100%; justify-content: center;">Re-processar Agora</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mainland/Report Section -->
+        <main>
+
+
+            <!-- Tab Master Container (Unified Card/Notebook style) -->
+            <div class="tab-master-container">
+                <!-- Navigation Tabs -->
+                <nav class="tab-navigation">
+                    <button id="btn-tab-dashboard" class="tab-button active" onclick="switchTab('tab-dashboard')">🏠
+                        Dashboard</button>
+                    <button id="btn-tab-bens" class="tab-button" onclick="switchTab('tab-bens')">📑 Bens e
+                        Direitos</button>
+                    <button id="btn-tab-transacoes" class="tab-button" onclick="switchTab('tab-transacoes')">🕒
+                        Transações</button>
+                    <button id="btn-tab-operacoes" class="tab-button" onclick="switchTab('tab-operacoes')">📊
+                        DARF/Vendas</button>
+                    <button id="btn-tab-ir-mensal" class="tab-button" onclick="switchTab('tab-ir-mensal')">📄
+                        IR Mensal</button>
+                    <button id="btn-tab-fii-fiagro" class="tab-button" onclick="switchTab('tab-fii-fiagro')">🏢
+                        FIIs/Fiagro</button>
+                    <button id="btn-tab-rendimentos" class="tab-button" onclick="switchTab('tab-rendimentos')" disabled
+                        title="Futuro">📈 Rendimentos</button>
+                </nav>
+
+                <!-- Tab Viewport (The 'Mini-Page' area) -->
+                <div class="tab-viewport">
+                    <!-- Tab Content 1: Dashboard (Default) -->
+                    <div id="tab-dashboard" class="tab-content active">
+                        <section
+                            style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 500px; gap: 1.5rem; text-align: center;">
+                            <div class="infinite-spinner"></div>
+                            <h3 style="color: var(--text-muted); font-weight: 500;">Sincronizando estatísticas
+                                avançadas...</h3>
+                            <p style="font-size: 0.8rem; color: var(--text-dim);">Este módulo está sendo preparado para
+                                sua próxima declaração.</p>
+                        </section>
+                    </div>
+
+                    <!-- Tab Content 2: Bens e Direitos (Consolidated) -->
+                    <div id="tab-bens" class="tab-content">
+                        <div id="summary-container" class="panel category-summary-panel" style="margin-bottom: 2rem;">
+                            <!-- Populated via JS -->
+                        </div>
+
+                        <div class="panel">
+                            <div class="flex content-between items-center">
+                                <h3>🏛️ Posição Consolidada</h3>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <span class="badge-info">Inclui Taxas B3</span>
+                                </div>
+                            </div>
+
+                            <div id="holdings-container">
+                                <p class="empty-state">Sincronizando ativos...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab Content 3: Transações (Histórico) -->
+                    <div id="tab-transacoes" class="tab-content">
+                        <div class="panel">
+                            <div class="flex content-between items-center" style="margin-bottom: 1.5rem;">
+                                <h3>🕒 Histórico de Transações</h3>
+                                <div style="display: flex; flex-direction: column; gap: 12px;">
+                                    <div style="display: flex; gap: 8px; align-items: center; min-width: 300px;">
+                                        <div style="position: relative; flex: 1;">
+                                            <input type="text" id="transactionSearch" class="history-search-input"
+                                                placeholder="Buscar por ticker (ex: PETR4)..."
+                                                style="padding: 6px 10px 6px 30px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-hover); width: 100%; transition: all 0.2s;"
+                                                onkeyup="filterTransactions()">
+                                        </div>
+                                        <button onclick="loadTransactions()" class="menu-btn secondary-btn"
+                                            style="padding: 6px 10px; font-size: 0.7rem; margin: 0; white-space: nowrap;"
+                                            title="Sincronizar dados">
+                                            🔍
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="transactions-container" class="transactions-display-area">
+                                <!-- Populated via loadTransactions() -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="tab-rendimentos" class="tab-content"></div>
+                    <div id="tab-operacoes" class="tab-content">
+                        <div class="panel">
+                            <div class="flex content-between items-center" style="margin-bottom: 1.5rem;">
+                                <h3>📊 Relatório de Ganhos e Perdas (DARF)</h3>
+                                <div class="badge-info">Cálculo de Preço Médio FIFO/Médio</div>
+                            </div>
+                            <div id="sales-report-container">
+                                <p class="empty-state">Processando histórico de vendas...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- New IR Mensal Tab -->
+                    <div id="tab-ir-mensal" class="tab-content">
+                        <div class="ir-layout-container">
+                            <aside class="ir-sidebar">
+                                <div class="ir-sidebar-header" id="ir-sidebar-year">Meses de 2025</div>
+                                <div id="ir-month-list" class="ir-month-list">
+                                    <!-- Populated via JS -->
+                                </div>
+                            </aside>
+                            <div class="ir-main-content">
+                                <div class="panel ir-panel-form">
+                                    <div class="ir-form-header">
+                                        <h3 id="ir-selected-month-title">Renda Variável - Ganhos Líquidos ou Perdas</h3>
+                                        <div class="badge-info">Simulador da Receita Federal</div>
+                                    </div>
+                                    <div id="ir-form-body">
+                                        <p class="empty-state">Selecione um mês para ver os dados.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Fundos de Investimento Imobiliário ou Fiagro -->
+                    <div id="tab-fii-fiagro" class="tab-content">
+                        <div class="panel fii-fiagro-panel">
+                            <div class="fii-fiagro-header">
+                                <div>
+                                    <h3>🏢 Fundos de Investimento Imobiliário ou Fiagro</h3>
+                                    <p class="fii-fiagro-subtitle">
+                                        Tabela anual para preencher a ficha de ganhos líquidos ou perdas no IRPF.
+                                    </p>
+                                </div>
+
+                                <div class="fii-fiagro-actions">
+                                    <div class="form-group fii-fiagro-year-field">
+                                        <label>Ano-calendário</label>
+                                        <select id="fii-fiagro-year-select" onchange="renderFiiFiagroYearReport()">
+                                            <option value="">Carregando...</option>
+                                        </select>
+                                    </div>
+
+                                    <button type="button" class="menu-btn secondary-btn" onclick="copyFiiFiagroTable()"
+                                        title="Copiar tabela para conferência">
+                                        📋 Copiar tabela
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="fii-fiagro-report-container">
+                                <p class="empty-state">Selecione um ano para carregar a tabela.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Toast Component -->
+    <div id="toast" class="toast">Ação bem-sucedida!</div>
+
+
+    <!-- Nota: O histórico agora é uma aba fixa e não mais um modal -->
+    <!-- Modal: Confirmação -->
+    <div id="modal-confirm" class="modal-window">
+        <div class="modal-header">
+            <span class="modal-title">Confirmar Ação</span>
+            <button class="close-btn" onclick="closeModal('modal-confirm')">&times;</button>
+        </div>
+        <div class="modal-body" style="text-align: center;">
+            <p id="confirm-message" style="margin-bottom: 1.5rem;"></p>
+            <div style="display: flex; gap: 0.5rem;">
+                <button type="button" class="menu-btn secondary-btn" style="flex:1"
+                    onclick="closeModal('modal-confirm')">Cancelar</button>
+                <button type="button" id="confirm-action-btn" class="submit-btn"
+                    style="flex:1; background: var(--danger);">Confirmar Exclusão</button>
+            </div>
+        </div>
+    </div>
+    <!-- Auth Modal -->
+    <div id="modal-auth" class="auth-overlay" style="display: none;">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h2>DeclarAtivo</h2>
+                <p>Controle de IR sobre Investimentos</p>
+            </div>
+            <div class="auth-tabs">
+                <button class="auth-tab-btn active" onclick="switchAuthTab('login')">🔑 Entrar</button>
+                <button class="auth-tab-btn" onclick="switchAuthTab('register')">📝 Registrar</button>
+            </div>
+            <div class="auth-body">
+                <div id="auth-tab-login" class="auth-tab-content active">
+                    <form id="login-form" class="auth-form">
+                        <div class="form-group">
+                            <label>Usuário</label>
+                            <input type="text" name="username" placeholder="Seu nome de usuário" required autocomplete="username">
+                        </div>
+                        <div class="form-group">
+                            <label>Senha</label>
+                            <input type="password" name="password" placeholder="Sua senha" required autocomplete="current-password">
+                        </div>
+                        <div id="login-error" class="auth-error"></div>
+                        <button type="submit" class="submit-btn">Entrar</button>
+                    </form>
+                </div>
+                <div id="auth-tab-register" class="auth-tab-content">
+                    <form id="register-form" class="auth-form">
+                        <div class="form-group">
+                            <label>Usuário</label>
+                            <input type="text" name="username" placeholder="Escolha um nome de usuário" required autocomplete="username">
+                        </div>
+                        <div class="form-group">
+                            <label>Senha</label>
+                            <input type="password" name="password" placeholder="Crie uma senha" required autocomplete="new-password">
+                        </div>
+                        <div id="register-error" class="auth-error"></div>
+                        <button type="submit" class="submit-btn" style="background: linear-gradient(135deg, #10b981, #059669);">Criar Conta</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+
+</html>
