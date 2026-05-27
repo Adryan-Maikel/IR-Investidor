@@ -9,6 +9,7 @@ import IrMensalView from './views/IrMensalView';
 import FiiFiagroView from './views/FiiFiagroView';
 import Toast from './components/Toast';
 import Modal from './components/Modal';
+import CommandDock from './components/CommandDock';
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || '');
@@ -137,6 +138,13 @@ export default function App() {
     } catch (e) {
       setToast({ message: 'Erro ao salvar configurações.', type: 'error' });
     }
+  };
+
+  const handleDockAction = (actionId) => {
+    setActiveTab('tab-transacoes');
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('open-global-modal', { detail: actionId }));
+    }, 100);
   };
 
   if (!token) {
@@ -280,6 +288,9 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Global Floating Command Dock Hub */}
+      <CommandDock onAction={handleDockAction} />
 
       {/* Global Toast component */}
       {toast && (

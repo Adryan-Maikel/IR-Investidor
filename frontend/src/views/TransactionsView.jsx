@@ -48,6 +48,27 @@ export default function TransactionsView({ fetchWithAuth, setToast }) {
     loadData();
   }, []);
 
+  useEffect(() => {
+    const handleGlobalModalOpen = (e) => {
+      const modalId = e.detail;
+      if (modalId === 'new-operation') {
+        setOpForm({ id: '', ticker: '', action: 'Comprar', date: new Date().toISOString().split('T')[0], quantity: '', price: '', taxes: '0' });
+        setIsOpModalOpen(true);
+      } else if (modalId === 'new-event') {
+        setEventForm({ id: '', ticker: '', action: 'Desdobramento', ticker_destino: '', date: new Date().toISOString().split('T')[0], quantity: '' });
+        setIsEventModalOpen(true);
+      } else if (modalId === 'new-swap') {
+        setSwapForm({ ticker_out: '', qty_out: '', ticker_in: '', qty_in: '', date: new Date().toISOString().split('T')[0], total_brl: '' });
+        setIsSwapModalOpen(true);
+      } else if (modalId === 'manage-assets') {
+        setIsTickerListModalOpen(true);
+      }
+    };
+
+    window.addEventListener('open-global-modal', handleGlobalModalOpen);
+    return () => window.removeEventListener('open-global-modal', handleGlobalModalOpen);
+  }, [tickers]);
+
   // Handle operation submit (Insert / Update)
   const handleOpSubmit = async (e) => {
     e.preventDefault();
