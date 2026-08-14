@@ -291,8 +291,8 @@ export default function DarfView({ fetchWithAuth, setToast }) {
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-white">DARFs e Histórico de Vendas</h2>
-          <p className="text-zinc-400 text-sm">Apuração mensal de ganhos e perdas tributáveis para Renda Variável</p>
+          <h2 className="text-3xl font-black text-white tracking-tight">DARFs e Histórico de Vendas</h2>
+          <p className="text-zinc-400 text-sm mt-1">Apuração mensal de ganhos e perdas tributáveis para Renda Variável</p>
         </div>
         <button 
           onClick={loadData}

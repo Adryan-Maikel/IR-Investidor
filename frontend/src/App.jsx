@@ -453,9 +453,9 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0b0b14] flex flex-col">
+    <div className="min-h-screen bg-[#0b0b14] flex flex-col overflow-x-hidden">
       {/* Top Header navbar */}
-      <header className="sticky top-0 z-30 glass-panel border-b border-white/5 py-4 px-6 md:px-8 flex justify-between items-center shadow-lg">
+      <header className="sticky top-0 z-30 glass-panel border-b border-white/5 py-3.5 px-6 md:px-10 flex justify-between items-center shadow-xl">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-indigo-600 text-white shadow-md">
             <Sparkles className="w-5 h-5 animate-pulse" />
@@ -505,19 +505,19 @@ export default function App() {
       </header>
 
       {/* Main content body with Side menu navigation */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-8 py-8 flex flex-col md:flex-row gap-8">
+      <div className="flex-1 w-full px-5 md:px-8 lg:px-10 py-7 flex flex-col md:flex-row gap-6">
         {/* Sidebar Nav */}
-        <aside className="w-full md:w-64 flex-shrink-0">
-          <div className="glass-panel p-4 rounded-2xl space-y-1.5 sticky top-24 bg-black/25">
-            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-3 mb-2.5">Navegação</p>
+        <aside className="w-full md:w-52 flex-shrink-0">
+          <div className="glass-panel p-3 rounded-2xl space-y-1 sticky top-20 bg-black/30">
+            <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider px-3 mb-2">Navegação</p>
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full px-4 py-3 rounded-xl text-xs font-bold flex items-center gap-3 transition-all ${
+                className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all duration-200 ${
                   activeTab === tab.id 
-                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md' 
-                    : 'text-zinc-400 hover:bg-white/5 hover:text-white'
+                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-900/40 scale-[1.01]' 
+                    : 'text-zinc-400 hover:bg-white/[0.06] hover:text-white hover:translate-x-0.5'
                 }`}
               >
                 {tab.icon}
@@ -551,7 +551,7 @@ export default function App() {
         </aside>
 
         {/* View content panel */}
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 overflow-x-hidden">
           {activeTab === 'tab-dashboard' && (
             <DashboardView 
               fetchWithAuth={fetchWithAuth} 

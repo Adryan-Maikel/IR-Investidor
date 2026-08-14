@@ -240,8 +240,8 @@ export default function FiiFiagroView({ fetchWithAuth, setToast }) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-white">Ficha FIIs e Fiagro</h2>
-          <p className="text-zinc-400 text-sm">Resumos anuais de ganhos líquidos ou perdas na alienação de FII/Fiagro</p>
+          <h2 className="text-3xl font-black text-white tracking-tight">Ficha FIIs e Fiagro</h2>
+          <p className="text-zinc-400 text-sm mt-1">Resumos anuais de ganhos líquidos ou perdas na alienação de FII/Fiagro</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">

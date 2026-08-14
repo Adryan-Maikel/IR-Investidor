@@ -173,8 +173,8 @@ export default function IrMensalView({ fetchWithAuth, setToast }) {
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-white">Simulador IR Mensal</h2>
-          <p className="text-zinc-400 text-sm">Visualização de ganhos no layout padrão do programa da Receita Federal</p>
+          <h2 className="text-3xl font-black text-white tracking-tight">Simulador IR Mensal</h2>
+          <p className="text-zinc-400 text-sm mt-1">Visualização de ganhos no layout padrão do programa da Receita Federal</p>
         </div>
         <button 
           onClick={loadData}

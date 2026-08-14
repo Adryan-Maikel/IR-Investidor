@@ -97,24 +97,24 @@ export default function HoldingsView({ fetchWithAuth, setToast }) {
       {/* View Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-white">Bens e Direitos (IRPF)</h2>
-          <p className="text-zinc-400 text-sm">Organização de ativos para transferência à ficha anual da Receita Federal</p>
+          <h2 className="text-3xl font-black text-white tracking-tight">Bens e Direitos (IRPF)</h2>
+          <p className="text-zinc-400 text-sm mt-1">Organização de ativos para transferência à ficha anual da Receita Federal</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Sub-tab selection */}
-          <div className="flex p-1 bg-black/20 rounded-xl border border-white/5">
+          <div className="flex p-1 bg-black/30 rounded-xl border border-white/5">
             <button
               onClick={() => setActiveSubTab('current')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                activeSubTab === 'current' ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:text-white'
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${
+                activeSubTab === 'current' ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'
               }`}
             >
               Posição Atual
             </button>
             <button
               onClick={() => setActiveSubTab('yearly')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeSubTab === 'yearly' ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:text-white'
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 flex items-center gap-1.5 ${
+                activeSubTab === 'yearly' ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'
               }`}
             >
               <Calendar className="w-3.5 h-3.5" />

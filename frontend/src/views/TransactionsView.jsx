@@ -70,8 +70,8 @@ export default function TransactionsView({ fetchWithAuth, setToast }) {
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-white">Transações e Eventos</h2>
-          <p className="text-zinc-400 text-sm">Registre, altere ou adicione compras, desdobramentos, swaps e ativos</p>
+          <h2 className="text-3xl font-black text-white tracking-tight">Transações e Eventos</h2>
+          <p className="text-zinc-400 text-sm mt-1">Registre, altere ou adicione compras, desdobramentos, swaps e ativos</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button 
