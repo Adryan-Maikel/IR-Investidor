@@ -34,6 +34,14 @@ export default function HoldingsView({ fetchWithAuth, setToast }) {
     loadData();
   }, []);
 
+  useEffect(() => {
+    const handleRefresh = () => {
+      loadData();
+    };
+    window.addEventListener('refresh-data', handleRefresh);
+    return () => window.removeEventListener('refresh-data', handleRefresh);
+  }, []);
+
   const toggleDeclared = async (ticker, year) => {
     try {
       const res = await fetchWithAuth('/api/toggle-declared-status', {
@@ -123,7 +131,7 @@ export default function HoldingsView({ fetchWithAuth, setToast }) {
       </div>
 
       {activeSubTab === 'current' ? (
-        <div className="glass-panel rounded-2xl overflow-hidden">
+        <div className="glass-panel rounded-2xl overflow-hidden flex flex-col flex-1 min-h-[500px]">
           <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-white/[0.01]">
             <h3 className="text-sm font-bold text-white">Posição Consolidada por Ativo</h3>
             <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-1 rounded font-bold uppercase tracking-wider">
@@ -131,10 +139,10 @@ export default function HoldingsView({ fetchWithAuth, setToast }) {
             </span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto flex-1">
+            <table className="w-full h-full">
               <thead>
-                <tr className="border-b border-white/5 bg-black/20">
+                <tr className="border-b border-white/5 bg-black/30">
                   <th className="px-6 py-4 text-xs font-semibold text-zinc-400 text-left">Ticker</th>
                   <th className="px-6 py-4 text-xs font-semibold text-zinc-400 text-left">Categoria</th>
                   <th className="px-6 py-4 text-xs font-semibold text-zinc-400 text-right">Quantidade</th>
@@ -146,34 +154,34 @@ export default function HoldingsView({ fetchWithAuth, setToast }) {
               <tbody className="divide-y divide-white/5">
                 {holdings.filter(h => h.quantity > 0).length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-6 py-12 text-center text-zinc-500 text-sm">
+                    <td colSpan="6" className="px-6 py-16 text-center text-zinc-500 text-sm">
                       Nenhuma posição em aberto encontrada. Registre novas operações na aba Transações!
                     </td>
                   </tr>
                 ) : (
                   holdings.filter(h => h.quantity > 0).map(h => (
-                    <tr key={h.ticker} className="hover:bg-white/[0.01] transition-colors">
+                    <tr key={h.ticker} className="group hover:bg-indigo-500/[0.06] transition-all duration-150 border-l-2 border-l-transparent hover:border-l-indigo-500 cursor-pointer">
                       <td className="px-6 py-4 text-left">
-                        <span className="bg-indigo-500/15 text-indigo-300 font-bold px-2.5 py-1 rounded text-xs">
+                        <span className="bg-indigo-500/15 group-hover:bg-indigo-500/25 text-indigo-300 font-bold px-2.5 py-1 rounded text-xs transition-colors">
                           {h.ticker}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-left text-zinc-300 text-xs font-medium">
+                      <td className="px-6 py-4 text-left text-zinc-300 text-xs font-medium group-hover:text-white">
                         {h.category}
                       </td>
                       <td className="px-6 py-4 text-right text-white font-semibold text-xs font-mono">
                         {h.quantity.toLocaleString('pt-BR', { maximumFractionDigits: 6 })}
                       </td>
-                      <td className="px-6 py-4 text-right text-zinc-300 text-xs font-mono">
+                      <td className="px-6 py-4 text-right text-zinc-300 text-xs font-mono group-hover:text-white">
                         {h.average_price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                       </td>
-                      <td className="px-6 py-4 text-right text-emerald-400 font-bold text-xs font-mono">
+                      <td className="px-6 py-4 text-right text-emerald-400 font-bold text-xs font-mono group-hover:text-emerald-300">
                         {h.total_invested.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <button
                           onClick={() => handleCopyIRDescription(h)}
-                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
                           title="Copiar texto de descrição IRPF"
                         >
                           {copiedTicker === h.ticker ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
@@ -188,7 +196,7 @@ export default function HoldingsView({ fetchWithAuth, setToast }) {
           </div>
         </div>
       ) : (
-        <div className="glass-panel rounded-2xl overflow-hidden">
+        <div className="glass-panel rounded-2xl overflow-hidden flex flex-col flex-1 min-h-[500px]">
           <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-white/[0.01]">
             <h3 className="text-sm font-bold text-white">Posição Histórica de Fechamento Anual (31/12)</h3>
             <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded font-bold uppercase tracking-wider">
@@ -196,10 +204,10 @@ export default function HoldingsView({ fetchWithAuth, setToast }) {
             </span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto flex-1">
+            <table className="w-full h-full">
               <thead>
-                <tr className="border-b border-white/5 bg-black/20">
+                <tr className="border-b border-white/5 bg-black/30">
                   <th className="px-6 py-4 text-xs font-semibold text-zinc-400 text-left" rowSpan="2">Ativo</th>
                   {years.map(year => (
                     <th key={year} className="px-6 py-2 text-xs font-bold text-zinc-300 text-center border-l border-white/5" colSpan="3">
@@ -207,7 +215,7 @@ export default function HoldingsView({ fetchWithAuth, setToast }) {
                     </th>
                   ))}
                 </tr>
-                <tr className="border-b border-white/5 bg-black/10">
+                <tr className="border-b border-white/5 bg-black/20">
                   {years.map(year => (
                     <React.Fragment key={`sub-${year}`}>
                       <th className="px-4 py-2 text-[10px] font-semibold text-zinc-400 text-right border-l border-white/5">Qtd</th>
@@ -220,15 +228,17 @@ export default function HoldingsView({ fetchWithAuth, setToast }) {
               <tbody className="divide-y divide-white/5">
                 {yearlyHoldings.length === 0 ? (
                   <tr>
-                    <td colSpan={1 + years.length * 3} className="px-6 py-12 text-center text-zinc-500 text-sm">
+                    <td colSpan={1 + years.length * 3} className="px-6 py-16 text-center text-zinc-500 text-sm">
                       Nenhum fechamento anual encontrado no histórico.
                     </td>
                   </tr>
                 ) : (
                   yearlyHoldings.map(h => (
-                    <tr key={h.ticker} className="hover:bg-white/[0.01] transition-colors">
-                      <td className="px-6 py-4 text-left font-bold text-zinc-200">
-                        {h.ticker}
+                    <tr key={h.ticker} className="group hover:bg-indigo-500/[0.06] transition-all duration-150 border-l-2 border-l-transparent hover:border-l-indigo-500 cursor-pointer">
+                      <td className="px-6 py-4 text-left font-bold text-zinc-200 group-hover:text-white">
+                        <span className="bg-indigo-500/15 group-hover:bg-indigo-500/25 text-indigo-300 font-bold px-2 py-0.5 rounded text-xs transition-colors">
+                          {h.ticker}
+                        </span>
                       </td>
                       {years.map(year => {
                         const yearData = h.years[year] || { quantity: 0, value: 0 };
@@ -236,17 +246,17 @@ export default function HoldingsView({ fetchWithAuth, setToast }) {
                         const isDeclared = !!declaredStatus[key];
                         return (
                           <React.Fragment key={`${h.ticker}-${year}`}>
-                            <td className="px-4 py-4 text-right text-zinc-300 text-xs font-mono border-l border-white/5">
+                            <td className="px-4 py-4 text-right text-zinc-300 text-xs font-mono border-l border-white/5 group-hover:text-white">
                               {yearData.quantity > 0 ? yearData.quantity.toLocaleString('pt-BR', { maximumFractionDigits: 6 }) : '-'}
                             </td>
-                            <td className="px-4 py-4 text-right text-emerald-400 font-bold text-xs font-mono">
+                            <td className="px-4 py-4 text-right text-emerald-400 font-bold text-xs font-mono group-hover:text-emerald-300">
                               {yearData.value > 0 ? yearData.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
                             </td>
                             <td className="px-4 py-4 text-center">
                               {yearData.quantity > 0 ? (
                                 <button
                                   onClick={() => toggleDeclared(h.ticker, year)}
-                                  className={`p-1.5 rounded-lg transition-colors ${
+                                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                                     isDeclared 
                                       ? 'text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20' 
                                       : 'text-zinc-500 bg-white/5 hover:bg-white/10'

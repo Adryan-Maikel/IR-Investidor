@@ -175,6 +175,14 @@ export default function FiiFiagroView({ fetchWithAuth, setToast }) {
     loadData();
   }, []);
 
+  useEffect(() => {
+    const handleRefresh = () => {
+      loadData();
+    };
+    window.addEventListener('refresh-data', handleRefresh);
+    return () => window.removeEventListener('refresh-data', handleRefresh);
+  }, []);
+
   const handleCopyTable = () => {
     const rows = reports[selectedYear] || [];
     if (rows.length === 0) return;
@@ -291,8 +299,8 @@ export default function FiiFiagroView({ fetchWithAuth, setToast }) {
           </div>
 
           {/* Main Table Grid */}
-          <div className="glass-panel rounded-2xl overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="glass-panel rounded-2xl overflow-hidden flex flex-col flex-1">
+            <div className="overflow-x-auto flex-1">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-black/40 border-b border-white/5 text-zinc-400 font-semibold">
@@ -308,15 +316,15 @@ export default function FiiFiagroView({ fetchWithAuth, setToast }) {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {rows.map(r => (
-                    <tr key={r.month} className="hover:bg-white/[0.01]">
-                      <td className="px-4 py-3 text-left font-bold text-zinc-300">{r.month}</td>
+                    <tr key={r.month} className="group hover:bg-indigo-500/[0.06] transition-all duration-150 border-l-2 border-l-transparent hover:border-l-indigo-500 cursor-pointer">
+                      <td className="px-4 py-3 text-left font-bold text-zinc-300 group-hover:text-white">{r.month}</td>
                       <td className={`px-4 py-3 text-right ${cls(r.result)}`}>{fmt(r.result)}</td>
                       <td className="px-4 py-3 text-right text-red-400/80 font-mono">{fmt(r.previousLoss)}</td>
-                      <td className="px-4 py-3 text-right text-zinc-300 font-mono">{fmt(r.taxableBase)}</td>
-                      <td className="px-4 py-3 text-right text-zinc-500 font-mono">{fmt(r.lossToCarry)}</td>
+                      <td className="px-4 py-3 text-right text-zinc-300 font-mono group-hover:text-white">{fmt(r.taxableBase)}</td>
+                      <td className="px-4 py-3 text-right text-zinc-500 font-mono group-hover:text-zinc-300">{fmt(r.lossToCarry)}</td>
                       <td className="px-4 py-3 text-right text-zinc-400 font-mono">20%</td>
-                      <td className="px-4 py-3 text-right text-indigo-400 font-bold font-mono">{fmt(r.taxDue)}</td>
-                      <td className="px-4 py-3 text-right text-indigo-400 font-bold font-mono">{fmt(r.taxToPay)}</td>
+                      <td className="px-4 py-3 text-right text-indigo-400 font-bold font-mono group-hover:text-indigo-300">{fmt(r.taxDue)}</td>
+                      <td className="px-4 py-3 text-right text-indigo-400 font-bold font-mono group-hover:text-indigo-300">{fmt(r.taxToPay)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -353,15 +361,15 @@ export default function FiiFiagroView({ fetchWithAuth, setToast }) {
                     </thead>
                     <tbody className="divide-y divide-white/5">
                       {allDetails.map((d, idx) => (
-                        <tr key={idx} className="hover:bg-white/[0.01]">
-                          <td className="px-4 py-3 text-left font-mono text-zinc-400">{d.date.split('-').reverse().join('/')}</td>
+                        <tr key={idx} className="group hover:bg-indigo-500/[0.06] transition-all duration-150 border-l-2 border-l-transparent hover:border-l-indigo-500 cursor-pointer">
+                          <td className="px-4 py-3 text-left font-mono text-zinc-400 group-hover:text-zinc-200">{d.date.split('-').reverse().join('/')}</td>
                           <td className="px-4 py-3 text-left">
-                            <span className="bg-indigo-500/15 text-indigo-300 font-bold px-2 py-0.5 rounded text-[10px]">{d.ticker}</span>
+                            <span className="bg-indigo-500/15 group-hover:bg-indigo-500/25 text-indigo-300 font-bold px-2 py-0.5 rounded text-[10px]">{d.ticker}</span>
                           </td>
-                          <td className="px-4 py-3 text-right font-mono text-zinc-300">{d.quantity.toLocaleString('pt-BR', { maximumFractionDigits: 6 })}</td>
-                          <td className="px-4 py-3 text-right font-mono text-zinc-300">{fmt(d.saleRevenue)}</td>
-                          <td className="px-4 py-3 text-right font-mono text-zinc-300">{fmt(d.saleCost)}</td>
-                          <td className="px-4 py-3 text-right font-mono text-zinc-500">{fmt(d.taxes)}</td>
+                          <td className="px-4 py-3 text-right font-mono text-zinc-300 group-hover:text-white">{d.quantity.toLocaleString('pt-BR', { maximumFractionDigits: 6 })}</td>
+                          <td className="px-4 py-3 text-right font-mono text-zinc-300 group-hover:text-white">{fmt(d.saleRevenue)}</td>
+                          <td className="px-4 py-3 text-right font-mono text-zinc-300 group-hover:text-white">{fmt(d.saleCost)}</td>
+                          <td className="px-4 py-3 text-right font-mono text-zinc-500 group-hover:text-zinc-300">{fmt(d.taxes)}</td>
                           <td className={`px-4 py-3 text-right font-bold font-mono ${d.result >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                             {fmt(d.result)}
                           </td>

@@ -138,6 +138,14 @@ export default function IrMensalView({ fetchWithAuth, setToast }) {
     loadData();
   }, []);
 
+  useEffect(() => {
+    const handleRefresh = () => {
+      loadData();
+    };
+    window.addEventListener('refresh-data', handleRefresh);
+    return () => window.removeEventListener('refresh-data', handleRefresh);
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
@@ -220,12 +228,12 @@ export default function IrMensalView({ fetchWithAuth, setToast }) {
                 <div className="text-right">Operações Comuns</div>
                 <div className="text-right">Day-Trade</div>
               </div>
-              <div className="grid grid-cols-3 py-3 px-4 border-b border-white/5 bg-white/[0.01]">
+              <div className="grid grid-cols-3 py-3 px-4 border-b border-white/5 bg-white/[0.01] hover:bg-indigo-500/[0.06] transition-all duration-150 border-l-2 border-l-transparent hover:border-l-indigo-500 cursor-pointer">
                 <div className="text-zinc-300">Mercado à vista - ações (Bens comuns)</div>
                 <div className={`text-right ${cls(currentData.comumAcoes)}`}>{fmt(currentData.comumAcoes)}</div>
                 <div className={`text-right ${cls(currentData.dtAcoes)}`}>{fmt(currentData.dtAcoes)}</div>
               </div>
-              <div className="grid grid-cols-3 py-3 px-4 text-zinc-500">
+              <div className="grid grid-cols-3 py-3 px-4 text-zinc-500 hover:bg-indigo-500/[0.04] transition-all duration-150 border-l-2 border-l-transparent hover:border-l-indigo-500 cursor-pointer">
                 <div>Mercado à vista - ouro</div>
                 <div className="text-right">0,00</div>
                 <div className="text-right">0,00</div>
@@ -242,22 +250,22 @@ export default function IrMensalView({ fetchWithAuth, setToast }) {
                 <div className="text-right">Operações Comuns</div>
                 <div className="text-right">Day-Trade</div>
               </div>
-              <div className="grid grid-cols-3 py-3 px-4 border-b border-white/5 bg-white/[0.01]">
+              <div className="grid grid-cols-3 py-3 px-4 border-b border-white/5 bg-white/[0.01] hover:bg-indigo-500/[0.06] transition-all duration-150 border-l-2 border-l-transparent hover:border-l-indigo-500 cursor-pointer">
                 <div className="text-zinc-300 font-semibold">Resultado líquido do mês</div>
                 <div className={`text-right ${cls(currentData.comumAcoes)}`}>{fmt(currentData.comumAcoes)}</div>
                 <div className={`text-right ${cls(currentData.dtAcoes)}`}>{fmt(currentData.dtAcoes)}</div>
               </div>
-              <div className="grid grid-cols-3 py-3 px-4 border-b border-white/5 text-zinc-500">
+              <div className="grid grid-cols-3 py-3 px-4 border-b border-white/5 text-zinc-500 hover:bg-indigo-500/[0.04] transition-all duration-150 border-l-2 border-l-transparent hover:border-l-indigo-500 cursor-pointer">
                 <div>Resultado negativo até o mês anterior</div>
                 <div className="text-right text-red-500/80">0,00</div>
                 <div className="text-right text-red-500/80">0,00</div>
               </div>
-              <div className="grid grid-cols-3 py-3 px-4 border-b border-white/5">
+              <div className="grid grid-cols-3 py-3 px-4 border-b border-white/5 hover:bg-indigo-500/[0.06] transition-all duration-150 border-l-2 border-l-transparent hover:border-l-indigo-500 cursor-pointer">
                 <div className="text-zinc-300 font-semibold">Base de cálculo do imposto</div>
                 <div className="text-right text-white font-mono">{fmt(Math.max(0, currentData.comumAcoes))}</div>
                 <div className="text-right text-white font-mono">{fmt(Math.max(0, currentData.dtAcoes))}</div>
               </div>
-              <div className="grid grid-cols-3 py-3 px-4 text-zinc-500">
+              <div className="grid grid-cols-3 py-3 px-4 text-zinc-500 hover:bg-indigo-500/[0.04] transition-all duration-150 border-l-2 border-l-transparent hover:border-l-indigo-500 cursor-pointer">
                 <div>Prejuízo a compensar</div>
                 <div className="text-right">{fmt(Math.min(0, currentData.comumAcoes))}</div>
                 <div className="text-right">{fmt(Math.min(0, currentData.dtAcoes))}</div>

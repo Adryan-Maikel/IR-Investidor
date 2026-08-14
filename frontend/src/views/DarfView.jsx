@@ -261,6 +261,14 @@ export default function DarfView({ fetchWithAuth, setToast }) {
     loadData();
   }, []);
 
+  useEffect(() => {
+    const handleRefresh = () => {
+      loadData();
+    };
+    window.addEventListener('refresh-data', handleRefresh);
+    return () => window.removeEventListener('refresh-data', handleRefresh);
+  }, []);
+
   const toggleMonth = (monthKey) => {
     setExpandedMonths(prev => ({
       ...prev,
@@ -394,7 +402,7 @@ export default function DarfView({ fetchWithAuth, setToast }) {
                     )}
 
                     {/* Table of operations inside this month */}
-                    <div className="overflow-x-auto border border-white/5 rounded-xl">
+                    <div className="overflow-x-auto border border-white/5 rounded-xl flex flex-col flex-1">
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="bg-black/40 border-b border-white/5 text-zinc-400">
@@ -409,10 +417,10 @@ export default function DarfView({ fetchWithAuth, setToast }) {
                         </thead>
                         <tbody className="divide-y divide-white/5">
                           {report.details.map((s, idx) => (
-                            <tr key={idx} className="hover:bg-white/[0.01]">
-                              <td className="px-4 py-3 text-zinc-400 text-left font-mono">{s.date.split('-').reverse().join('/')}</td>
+                            <tr key={idx} className="group hover:bg-indigo-500/[0.06] transition-all duration-150 border-l-2 border-l-transparent hover:border-l-indigo-500 cursor-pointer">
+                              <td className="px-4 py-3 text-zinc-400 text-left font-mono group-hover:text-zinc-200">{s.date.split('-').reverse().join('/')}</td>
                               <td className="px-4 py-3 text-left">
-                                <span className="bg-indigo-500/15 text-indigo-300 font-bold px-2 py-0.5 rounded text-[10px] mr-1.5">{s.ticker}</span>
+                                <span className="bg-indigo-500/15 group-hover:bg-indigo-500/25 text-indigo-300 font-bold px-2 py-0.5 rounded text-[10px] mr-1.5">{s.ticker}</span>
                                 <span className="text-[10px] text-zinc-500">{s.category}</span>
                               </td>
                               <td className="px-4 py-3 text-left">
@@ -420,9 +428,9 @@ export default function DarfView({ fetchWithAuth, setToast }) {
                                   {s.isDayTrade ? 'Day Trade' : 'Swing'}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-right text-zinc-300 font-mono">{s.quantity.toLocaleString('pt-BR', { maximumFractionDigits: 6 })}</td>
-                              <td className="px-4 py-3 text-right text-zinc-300 font-mono">{s.avgPriceAtSale.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                              <td className="px-4 py-3 text-right text-zinc-300 font-mono">{s.price_per_share.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                              <td className="px-4 py-3 text-right text-zinc-300 font-mono group-hover:text-white">{s.quantity.toLocaleString('pt-BR', { maximumFractionDigits: 6 })}</td>
+                              <td className="px-4 py-3 text-right text-zinc-300 font-mono group-hover:text-white">{s.avgPriceAtSale.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                              <td className="px-4 py-3 text-right text-zinc-300 font-mono group-hover:text-white">{s.price_per_share.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                               <td className={`px-4 py-3 text-right font-bold font-mono ${profitColors(s.profit)}`}>
                                 {s.profit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                               </td>

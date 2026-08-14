@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, LayoutDashboard, Wallet, RefreshCw, Layers, Award, FileText, Calendar, LogOut, Bell, Settings } from 'lucide-react';
+import { Sparkles, LayoutDashboard, Wallet, RefreshCw, Layers, Award, FileText, Calendar, LogOut, Bell, Settings, Edit3, Terminal } from 'lucide-react';
 import AuthView from './views/AuthView';
 import DashboardView from './views/DashboardView';
 import HoldingsView from './views/HoldingsView';
@@ -10,6 +10,8 @@ import FiiFiagroView from './views/FiiFiagroView';
 import Toast from './components/Toast';
 import Modal from './components/Modal';
 import CommandDock from './components/CommandDock';
+import TickerPicker from './components/TickerPicker';
+import CurrencyInput from './components/CurrencyInput';
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || '');
@@ -21,8 +23,39 @@ export default function App() {
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
 
+  // Floating Modals visibility states
+  const [isOpModalOpen, setIsOpModalOpen] = useState(false);
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
+  const [isTickerListModalOpen, setIsTickerListModalOpen] = useState(false);
+  const [isTickerFormModalOpen, setIsTickerFormModalOpen] = useState(false);
+
+  // Floating Form states
+  const [opForm, setOpForm] = useState({ id: '', ticker: '', action: 'Comprar', date: '', quantity: '', price: '', taxes: '0' });
+  const [eventForm, setEventForm] = useState({ id: '', ticker: '', action: 'Desdobramento', ticker_destino: '', date: '', quantity: '' });
+  const [swapForm, setSwapForm] = useState({ ticker_out: '', qty_out: '', ticker_in: '', qty_in: '', date: '', total_brl: '' });
+  const [tickerForm, setTickerForm] = useState({ ticker: '', name: '', category: 'Ações', cnpj: '', is_edit: false });
+
+  const handleOpenNewTickerModal = (prefillCode = '') => {
+    setTickerForm({
+      ticker: typeof prefillCode === 'string' ? prefillCode.toUpperCase().trim() : '',
+      name: '',
+      category: 'Ações',
+      cnpj: '',
+      is_edit: false
+    });
+    setIsTickerFormModalOpen(true);
+  };
+
+
+  // Unified lists of tickers
+  const [tickers, setTickers] = useState([]);
+
   // Category Colors
   const [categoryColors, setCategoryColors] = useState({});
+
+  // Command Dock state
+  const [isDockMinimized, setIsDockMinimized] = useState(false);
 
   // Helper fetch function that automatically injects the token
   const fetchWithAuth = async (url, options = {}) => {
@@ -81,15 +114,265 @@ export default function App() {
     }
   };
 
+  const loadTickers = async () => {
+    if (!token) return;
+    try {
+      const res = await fetchWithAuth('/api/tickers');
+      const data = await res.json();
+      if (res.ok) {
+        const tickersList = Object.keys(data).map(code => ({
+          code,
+          ...data[code]
+        }));
+        setTickers(tickersList);
+      }
+    } catch (err) {
+      console.error('Error loading tickers:', err);
+    }
+  };
+
   useEffect(() => {
     if (token) {
       loadInconsistencies();
       loadThemeSettings();
+      loadTickers();
       // Periodically check inconsistencies
       const interval = setInterval(loadInconsistencies, 30000);
       return () => clearInterval(interval);
     }
   }, [token]);
+
+  // Form submits and actions
+  const handleOpSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const isEdit = !!opForm.id;
+      const url = isEdit ? `/api/transactions/${opForm.id}` : '/api/transactions';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const payload = {
+        ticker: opForm.ticker,
+        action: opForm.action,
+        quantity: parseFloat(opForm.quantity),
+        price_per_share: parseFloat(opForm.price.toString().replace(/[^\d.,]/g, '').replace(',', '.')),
+        taxes: parseFloat(opForm.taxes.toString().replace(/[^\d.,]/g, '').replace(',', '.')) || 0,
+        date: opForm.date
+      };
+
+      const res = await fetchWithAuth(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setToast({ 
+          message: isEdit ? 'Operação atualizada com sucesso!' : 'Operação cadastrada! Modal mantido aberto para a próxima.', 
+          type: 'success' 
+        });
+        
+        if (isEdit) {
+          setIsOpModalOpen(false);
+          setOpForm({ id: '', ticker: '', action: 'Comprar', date: '', quantity: '', price: '', taxes: '0' });
+        } else {
+          // Keep modal open for rapid continuous entry! Preserve date & action.
+          setOpForm(prev => ({
+            id: '',
+            ticker: '',
+            action: prev.action || 'Comprar',
+            date: prev.date,
+            quantity: '',
+            price: '',
+            taxes: '0'
+          }));
+        }
+
+        loadTickers();
+        loadInconsistencies();
+        window.dispatchEvent(new CustomEvent('refresh-data'));
+      } else {
+        const error = await res.json();
+        setToast({ message: error.detail || 'Falha ao salvar operação.', type: 'error' });
+      }
+    } catch (err) {
+      setToast({ message: 'Erro na requisição.', type: 'error' });
+    }
+  };
+
+  const handleEventSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        ticker: eventForm.ticker,
+        action: eventForm.action,
+        quantity: parseFloat(eventForm.quantity),
+        price_per_share: 0,
+        taxes: 0,
+        date: eventForm.date,
+        ticker_destino: eventForm.action === 'Incorporacao' ? eventForm.ticker_destino : null,
+        fator_conversao: eventForm.action === 'Incorporacao' ? parseFloat(eventForm.quantity) : null
+      };
+
+      const res = await fetchWithAuth('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setToast({ message: 'Evento societário registrado!', type: 'success' });
+        setIsEventModalOpen(false);
+        setEventForm({ id: '', ticker: '', action: 'Desdobramento', ticker_destino: '', date: '', quantity: '' });
+        loadTickers();
+        loadInconsistencies();
+        window.dispatchEvent(new CustomEvent('refresh-data'));
+      } else {
+        const error = await res.json();
+        setToast({ message: error.detail || 'Falha ao salvar evento.', type: 'error' });
+      }
+    } catch (err) {
+      setToast({ message: 'Erro na requisição.', type: 'error' });
+    }
+  };
+
+  const handleSwapSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const totalBrl = parseFloat(swapForm.total_brl.toString().replace(/[^\d.,]/g, '').replace(',', '.'));
+      const payload = [
+        {
+          ticker: swapForm.ticker_out,
+          action: 'Vender',
+          quantity: parseFloat(swapForm.qty_out),
+          price_per_share: totalBrl / parseFloat(swapForm.qty_out),
+          taxes: 0,
+          date: swapForm.date
+        },
+        {
+          ticker: swapForm.ticker_in,
+          action: 'Comprar',
+          quantity: parseFloat(swapForm.qty_in),
+          price_per_share: totalBrl / parseFloat(swapForm.qty_in),
+          taxes: 0,
+          date: swapForm.date
+        }
+      ];
+
+      const res = await fetchWithAuth('/api/transactions/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setToast({ message: 'Swap atômico realizado com sucesso!', type: 'success' });
+        setIsSwapModalOpen(false);
+        setSwapForm({ ticker_out: '', qty_out: '', ticker_in: '', qty_in: '', date: '', total_brl: '' });
+        loadTickers();
+        loadInconsistencies();
+        window.dispatchEvent(new CustomEvent('refresh-data'));
+      } else {
+        const error = await res.json();
+        setToast({ message: error.detail || 'Falha ao salvar swap.', type: 'error' });
+      }
+    } catch (err) {
+      setToast({ message: 'Erro na requisição.', type: 'error' });
+    }
+  };
+
+  const handleTickerSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetchWithAuth('/api/tickers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: tickerForm.ticker.toUpperCase().trim(),
+          name: tickerForm.name,
+          cnpj: tickerForm.cnpj,
+          category: tickerForm.category
+        })
+      });
+
+      if (res.ok) {
+        setToast({ message: 'Metadados do ativo salvos!', type: 'success' });
+        setIsTickerFormModalOpen(false);
+        setTickerForm({ ticker: '', name: '', category: 'Ações', cnpj: '', is_edit: false });
+        loadTickers();
+        loadInconsistencies();
+        window.dispatchEvent(new CustomEvent('refresh-data'));
+      } else {
+        const error = await res.json();
+        setToast({ message: error.detail || 'Falha ao salvar ativo.', type: 'error' });
+      }
+    } catch (err) {
+      setToast({ message: 'Erro na requisição.', type: 'error' });
+    }
+  };
+
+  const fetchScrapedTickerInfo = async () => {
+    const symbol = tickerForm.ticker.toUpperCase().trim();
+    if (!symbol) return;
+    setToast({ message: 'Buscando informações online...', type: 'info' });
+    try {
+      const res = await fetchWithAuth(`/api/fetch-ticker-info/${symbol}`);
+      const data = await res.json();
+      if (res.ok && data.name) {
+        setTickerForm(prev => ({
+          ...prev,
+          name: data.name || prev.name,
+          cnpj: data.cnpj || prev.cnpj,
+          category: data.category || prev.category
+        }));
+        setToast({ message: 'Informações carregadas!', type: 'success' });
+      } else {
+        setToast({ message: 'Nenhuma informação encontrada.', type: 'warning' });
+      }
+    } catch (err) {
+      setToast({ message: 'Erro ao raspar dados.', type: 'error' });
+    }
+  };
+
+  // Listeners for global modal requests
+  useEffect(() => {
+    const handleGlobalModalOpen = (e) => {
+      const modalId = e.detail;
+      const today = new Date().toISOString().split('T')[0];
+      if (modalId === 'new-operation') {
+        setOpForm({ id: '', ticker: '', action: 'Comprar', date: today, quantity: '', price: '', taxes: '0' });
+        setIsOpModalOpen(true);
+      } else if (modalId === 'new-event') {
+        setEventForm({ id: '', ticker: '', action: 'Desdobramento', ticker_destino: '', date: today, quantity: '' });
+        setIsEventModalOpen(true);
+      } else if (modalId === 'new-swap') {
+        setSwapForm({ ticker_out: '', qty_out: '', ticker_in: '', qty_in: '', date: today, total_brl: '' });
+        setIsSwapModalOpen(true);
+      } else if (modalId === 'manage-assets') {
+        setIsTickerListModalOpen(true);
+      }
+    };
+
+    const handleEditGlobalTransaction = (e) => {
+      const tx = e.detail;
+      setOpForm({
+        id: tx.id,
+        ticker: tx.ticker,
+        action: tx.action,
+        date: tx.date,
+        quantity: tx.quantity.toString(),
+        price: tx.price_per_share.toString(),
+        taxes: tx.taxes.toString()
+      });
+      setIsOpModalOpen(true);
+    };
+
+    window.addEventListener('open-global-modal', handleGlobalModalOpen);
+    window.addEventListener('edit-global-transaction', handleEditGlobalTransaction);
+    return () => {
+      window.removeEventListener('open-global-modal', handleGlobalModalOpen);
+      window.removeEventListener('edit-global-transaction', handleEditGlobalTransaction);
+    };
+  }, []);
 
   const ignoreInconsistency = async (ticker, ids = []) => {
     if (!confirm('Deseja marcar como correto? Esta inconsistência não será mais exibida.')) return;
@@ -141,10 +424,7 @@ export default function App() {
   };
 
   const handleDockAction = (actionId) => {
-    setActiveTab('tab-transacoes');
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('open-global-modal', { detail: actionId }));
-    }, 100);
+    window.dispatchEvent(new CustomEvent('open-global-modal', { detail: actionId }));
   };
 
   if (!token) {
@@ -244,6 +524,29 @@ export default function App() {
                 {tab.label}
               </button>
             ))}
+
+            {/* Premium Dock integration toggle */}
+            <div className="pt-3.5 border-t border-white/5 mt-3">
+              <button
+                onClick={() => setIsDockMinimized(!isDockMinimized)}
+                className={`w-full px-4 py-3 rounded-xl text-xs font-bold flex items-center justify-between transition-all duration-300 ${
+                  !isDockMinimized 
+                    ? 'bg-indigo-600/10 border border-indigo-500/10 text-indigo-400' 
+                    : 'bg-gradient-to-r from-indigo-600 to-violet-600 border border-white/10 text-white shadow-lg hover:scale-[1.02] active:scale-95 cursor-pointer'
+                }`}
+                title={!isDockMinimized ? "Minimizar/Recolher comandos flutuantes" : "Expandir/Flutuar comandos flutuantes"}
+              >
+                <div className="flex items-center gap-3">
+                  <Terminal className="w-4 h-4" />
+                  <span>Comandos Rápidos</span>
+                </div>
+                <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider ${
+                  !isDockMinimized ? 'bg-indigo-500/20 text-indigo-300' : 'bg-white/20 text-white animate-pulse'
+                }`}>
+                  {!isDockMinimized ? 'Ativo' : 'Flutuar'}
+                </span>
+              </button>
+            </div>
           </div>
         </aside>
 
@@ -290,7 +593,11 @@ export default function App() {
       </div>
 
       {/* Global Floating Command Dock Hub */}
-      <CommandDock onAction={handleDockAction} />
+      <CommandDock 
+        onAction={handleDockAction} 
+        isMinimized={isDockMinimized} 
+        setIsMinimized={setIsDockMinimized} 
+      />
 
       {/* Global Toast component */}
       {toast && (
@@ -393,6 +700,369 @@ export default function App() {
             className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all mt-4"
           >
             Salvar Preferências
+          </button>
+        </form>
+      </Modal>
+
+      {/* 1. Modal: Nova Operação */}
+      <Modal isOpen={isOpModalOpen} onClose={() => setIsOpModalOpen(false)} title={opForm.id ? "📝 Editar Operação" : "💸 Nova Operação de Compra/Venda"}>
+        <form onSubmit={handleOpSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Ativo</label>
+              <TickerPicker
+                value={opForm.ticker}
+                onChange={(val) => setOpForm({ ...opForm, ticker: val })}
+                tickers={tickers}
+                onAddNewTicker={handleOpenNewTickerModal}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Ordem</label>
+              <select 
+                value={opForm.action} 
+                onChange={(e) => setOpForm({...opForm, action: e.target.value})} 
+                className="w-full py-2.5 px-3 bg-black/40 border border-white/10 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+              >
+                <option value="Comprar">Compra</option>
+                <option value="Vender">Venda</option>
+                <option value="Recompensa">Recompensa</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Data</label>
+              <input 
+                type="date" 
+                value={opForm.date} 
+                onChange={(e) => setOpForm({...opForm, date: e.target.value})} 
+                className="w-full py-2 px-3 bg-black/40 border border-white/5 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Quantidade</label>
+              <input 
+                type="number" 
+                step="any" 
+                value={opForm.quantity} 
+                onChange={(e) => setOpForm({...opForm, quantity: e.target.value})} 
+                placeholder="0.00" 
+                className="w-full py-2 px-3 bg-black/40 border border-white/5 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Preço Unitário</label>
+              <CurrencyInput
+                value={opForm.price}
+                onChange={(val) => setOpForm({ ...opForm, price: val })}
+                placeholder="26,66"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Taxas (B3)</label>
+              <CurrencyInput
+                value={opForm.taxes}
+                onChange={(val) => setOpForm({ ...opForm, taxes: val })}
+                placeholder="0,02"
+              />
+            </div>
+          </div>
+
+          <button 
+            type="submit" 
+            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all mt-4"
+          >
+            {opForm.id ? "Salvar Alterações" : "Registrar Operação"}
+          </button>
+        </form>
+      </Modal>
+
+      {/* 2. Modal: Desdobrar / Agrupar */}
+      <Modal isOpen={isEventModalOpen} onClose={() => setIsEventModalOpen(false)} title="🔄 Desdobramento / Grupamento / Fusão">
+        <form onSubmit={handleEventSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Ativo de Origem</label>
+              <TickerPicker
+                value={eventForm.ticker}
+                onChange={(val) => setEventForm({ ...eventForm, ticker: val })}
+                tickers={tickers}
+                onAddNewTicker={handleOpenNewTickerModal}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Tipo Evento</label>
+              <select 
+                value={eventForm.action} 
+                onChange={(e) => setEventForm({...eventForm, action: e.target.value})} 
+                className="w-full py-2.5 px-3 bg-black/40 border border-white/10 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+              >
+                <option value="Desdobramento">Desdobrar (Split)</option>
+                <option value="Grupamento">Agrupar (Inverso)</option>
+                <option value="Incorporacao">Incorporação (Fusão)</option>
+              </select>
+            </div>
+          </div>
+
+          {eventForm.action === 'Incorporacao' && (
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Ativo de Destino</label>
+              <TickerPicker
+                value={eventForm.ticker_destino}
+                onChange={(val) => setEventForm({ ...eventForm, ticker_destino: val })}
+                tickers={tickers}
+                onAddNewTicker={handleOpenNewTickerModal}
+                required
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Data do Evento</label>
+              <input 
+                type="date" 
+                value={eventForm.date} 
+                onChange={(e) => setEventForm({...eventForm, date: e.target.value})} 
+                className="w-full py-2 px-3 bg-black/40 border border-white/5 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">
+                {eventForm.action === 'Incorporacao' ? 'Fator de Conversão' : 'Fator (Ratio)'}
+              </label>
+              <input 
+                type="number" 
+                step="any" 
+                value={eventForm.quantity} 
+                onChange={(e) => setEventForm({...eventForm, quantity: e.target.value})} 
+                placeholder="ex: 1.0" 
+                className="w-full py-2 px-3 bg-black/40 border border-white/5 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                required
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-zinc-500">* Neste evento não há fluxo financeiro direto. No caso de incorporação, o saldo do ativo de origem será zerado proporcionalmente.</p>
+          <button 
+            type="submit" 
+            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all mt-4"
+          >
+            Aplicar Evento Societário
+          </button>
+        </form>
+      </Modal>
+
+      {/* 3. Modal: Swap Cripto */}
+      <Modal isOpen={isSwapModalOpen} onClose={() => setIsSwapModalOpen(false)} title="💱 Troca de Cripto (Swap)">
+        <form onSubmit={handleSwapSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Ativo que Sai (Origem)</label>
+              <TickerPicker
+                value={swapForm.ticker_out}
+                onChange={(val) => setSwapForm({ ...swapForm, ticker_out: val })}
+                tickers={tickers.filter(t => (t.category || '').toLowerCase() === 'cripto')}
+                onAddNewTicker={handleOpenNewTickerModal}
+                placeholder="Selecione a Cripto de saída..."
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Qtd de Saída</label>
+              <input 
+                type="number" 
+                step="any" 
+                value={swapForm.qty_out} 
+                onChange={(e) => setSwapForm({...swapForm, qty_out: e.target.value})} 
+                placeholder="0.00" 
+                className="w-full py-2 px-3 bg-black/40 border border-white/5 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Ativo que Entra (Destino)</label>
+              <TickerPicker
+                value={swapForm.ticker_in}
+                onChange={(val) => setSwapForm({ ...swapForm, ticker_in: val })}
+                tickers={tickers.filter(t => (t.category || '').toLowerCase() === 'cripto')}
+                onAddNewTicker={handleOpenNewTickerModal}
+                placeholder="Selecione a Cripto de entrada..."
+                required
+              />
+            </div>
+            <div>
+
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Qtd de Entrada</label>
+              <input 
+                type="number" 
+                step="any" 
+                value={swapForm.qty_in} 
+                onChange={(e) => setSwapForm({...swapForm, qty_in: e.target.value})} 
+                placeholder="0.00" 
+                className="w-full py-2 px-3 bg-black/40 border border-white/5 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Data da Troca</label>
+              <input 
+                type="date" 
+                value={swapForm.date} 
+                onChange={(e) => setSwapForm({...swapForm, date: e.target.value})} 
+                className="w-full py-2 px-3 bg-black/40 border border-white/5 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Valor Total Equivalente (R$)</label>
+              <CurrencyInput
+                value={swapForm.total_brl}
+                onChange={(val) => setSwapForm({ ...swapForm, total_brl: val })}
+                placeholder="0,00"
+                required
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-zinc-500">* Registrará uma Venda e uma Compra simultâneas sob o mesmo valor total BRL para fins de Preço Médio e declaração fiscal.</p>
+          <button 
+            type="submit" 
+            className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all mt-4"
+          >
+            Confirmar Swap Atômico
+          </button>
+        </form>
+      </Modal>
+
+      {/* 4. Modal: Gerenciar Ativos (List) */}
+      <Modal isOpen={isTickerListModalOpen} onClose={() => setIsTickerListModalOpen(false)} title="🏷️ Gerenciar Ativos (Tickers)" maxWidth="max-w-xl">
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <p className="text-xs text-zinc-400">Visualize e adicione metadados da empresa/ativo.</p>
+            <button 
+              onClick={() => {
+                setTickerForm({ ticker: '', name: '', category: 'Ações', cnpj: '', is_edit: false });
+                setIsTickerFormModalOpen(true);
+              }}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-bold transition-all shadow-md cursor-pointer"
+            >
+              + Novo Ativo
+            </button>
+          </div>
+
+          <div className="border border-white/5 rounded-xl overflow-hidden max-h-80 overflow-y-auto divide-y divide-white/5 bg-black/20">
+            {tickers.map(tk => (
+              <div key={tk.code} className="flex justify-between items-center px-4 py-3 hover:bg-white/[0.02] transition-colors">
+                <div>
+                  <span className="bg-indigo-500/15 text-indigo-300 font-bold px-2 py-0.5 rounded text-[10px]">
+                    {tk.code}
+                  </span>
+                  <span className="text-zinc-400 text-xs font-semibold ml-2">{tk.name || 'Sem nome social'}</span>
+                  <div className="text-[10px] text-zinc-500 mt-1">CNPJ: {tk.cnpj || 'N/A'} • Cat: {tk.category}</div>
+                </div>
+                <button
+                  onClick={() => {
+                    setTickerForm({ ticker: tk.code, name: tk.name || '', category: tk.category, cnpj: tk.cnpj || '', is_edit: true });
+                    setIsTickerFormModalOpen(true);
+                  }}
+                  className="p-1.5 text-zinc-400 hover:text-indigo-400 hover:bg-white/5 rounded transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+
+      {/* 5. Modal: Cadastrar / Editar Ativo */}
+      <Modal isOpen={isTickerFormModalOpen} onClose={() => setIsTickerFormModalOpen(false)} title={tickerForm.is_edit ? "📝 Editar Ativo" : "➕ Cadastrar Novo Ativo"}>
+        <form onSubmit={handleTickerSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Ticker (Código)</label>
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                value={tickerForm.ticker} 
+                onChange={(e) => setTickerForm({...tickerForm, ticker: e.target.value})} 
+                placeholder="EX: PETR4" 
+                className="flex-1 py-2 px-3 bg-black/40 border border-white/5 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 uppercase"
+                required
+                disabled={tickerForm.is_edit}
+              />
+              {!tickerForm.is_edit && (
+                <button
+                  type="button"
+                  onClick={fetchScrapedTickerInfo}
+                  className="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-colors flex items-center justify-center cursor-pointer font-bold"
+                  title="Buscar informações automáticas"
+                >
+                  🔍 Buscar
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Nome / Razão Social</label>
+            <input 
+              type="text" 
+              value={tickerForm.name} 
+              onChange={(e) => setTickerForm({...tickerForm, name: e.target.value})} 
+              placeholder="PETROLEO BRASILEIRO S.A." 
+              className="w-full py-2 px-3 bg-black/40 border border-white/5 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Categoria</label>
+              <select 
+                value={tickerForm.category} 
+                onChange={(e) => setTickerForm({...tickerForm, category: e.target.value})} 
+                className="w-full py-2 px-3 bg-black/40 border border-white/5 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+              >
+                <option value="Ações">Ações</option>
+                <option value="FIIs">FIIs</option>
+                <option value="Cripto">Cripto</option>
+                <option value="BDRs">BDRs</option>
+                <option value="Outros">Outros</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">CNPJ</label>
+              <input 
+                type="text" 
+                value={tickerForm.cnpj} 
+                onChange={(e) => setTickerForm({...tickerForm, cnpj: e.target.value})} 
+                placeholder="00.000.000/0001-00" 
+                className="w-full py-2 px-3 bg-black/40 border border-white/5 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
+          <button 
+            type="submit" 
+            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all mt-4 cursor-pointer font-bold"
+          >
+            Salvar Ativo
           </button>
         </form>
       </Modal>

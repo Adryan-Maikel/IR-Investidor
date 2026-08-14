@@ -28,6 +28,14 @@ export default function DashboardView({ fetchWithAuth, setToast, onSwitchTab }) 
     loadData();
   }, []);
 
+  useEffect(() => {
+    const handleRefresh = () => {
+      loadData();
+    };
+    window.addEventListener('refresh-data', handleRefresh);
+    return () => window.removeEventListener('refresh-data', handleRefresh);
+  }, []);
+
   // Process data for charts
   const totalInvested = holdings.reduce((acc, h) => acc + h.total_invested, 0);
   const totalAssetsCount = holdings.filter(h => h.quantity > 0).length;
@@ -82,44 +90,40 @@ export default function DashboardView({ fetchWithAuth, setToast, onSwitchTab }) 
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="glass-panel p-6 rounded-2xl relative overflow-hidden">
+        <div className="glass-panel p-6 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[135px]">
           <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl" />
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl">
-              <Wallet className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Patrimônio Alocado</p>
-              <h3 className="text-2xl font-bold text-white mt-1">
-                {totalInvested.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-              </h3>
-            </div>
+          <div className="p-2.5 bg-indigo-500/10 text-indigo-400 rounded-xl w-fit">
+            <Wallet className="w-5.5 h-5.5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Patrimônio Alocado</p>
+            <h3 className="text-xl lg:text-2xl font-black text-white mt-1.5 whitespace-nowrap">
+              {totalInvested.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </h3>
           </div>
         </div>
 
-        <div className="glass-panel p-6 rounded-2xl relative overflow-hidden">
+        <div className="glass-panel p-6 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[135px]">
           <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl" />
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl">
-              <Award className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Ativos em Carteira</p>
-              <h3 className="text-2xl font-bold text-white mt-1">{totalAssetsCount} ativos</h3>
-            </div>
+          <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl w-fit">
+            <Award className="w-5.5 h-5.5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Ativos em Carteira</p>
+            <h3 className="text-xl lg:text-2xl font-black text-white mt-1.5">{totalAssetsCount} ativos</h3>
           </div>
         </div>
 
-        <div className="glass-panel p-6 rounded-2xl relative overflow-hidden col-span-2">
+        <div className="glass-panel p-6 rounded-2xl relative overflow-hidden col-span-2 flex items-center min-h-[135px]">
           <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl" />
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-amber-500/10 text-amber-400 rounded-xl">
-                <AlertCircle className="w-6 h-6" />
+          <div className="flex-1 flex justify-between items-center gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl flex-shrink-0">
+                <AlertCircle className="w-5.5 h-5.5" />
               </div>
-              <div>
-                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Inconsistências Pendentes</p>
-                <h3 className="text-lg font-bold text-white mt-1">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Inconsistências Pendentes</p>
+                <h3 className="text-base font-extrabold text-white mt-0.5">
                   {inconsistencies.length === 0 
                     ? '🎉 Tudo regularizado!' 
                     : `${inconsistencies.length} pendências encontradas`}
@@ -129,7 +133,7 @@ export default function DashboardView({ fetchWithAuth, setToast, onSwitchTab }) 
             {inconsistencies.length > 0 && (
               <button 
                 onClick={() => onSwitchTab('tab-transacoes')}
-                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold rounded-xl transition-all shadow-lg"
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold rounded-xl transition-all shadow-lg flex-shrink-0 cursor-pointer"
               >
                 Revisar Transações
               </button>
@@ -142,13 +146,13 @@ export default function DashboardView({ fetchWithAuth, setToast, onSwitchTab }) 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Category Pie Chart */}
         <div className="glass-panel p-6 rounded-2xl flex flex-col">
-          <h3 className="text-sm font-bold text-zinc-300 mb-6">Alocação por Categoria</h3>
+          <h3 className="text-sm font-bold text-zinc-300 mb-6">Alocação por Categoria (Clique para Filtrar)</h3>
           {pieData.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-sm">
               Nenhum ativo alocado no momento.
             </div>
           ) : (
-            <div className="flex-1 h-[300px] flex items-center">
+            <div className="flex-1 h-[380px] flex items-center">
               <div className="w-2/3 h-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -156,10 +160,17 @@ export default function DashboardView({ fetchWithAuth, setToast, onSwitchTab }) 
                       data={pieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={90}
+                      innerRadius="55%"
+                      outerRadius="75%"
                       paddingAngle={4}
                       dataKey="value"
+                      onClick={(data) => {
+                        if (data && data.name) {
+                          localStorage.setItem('transaction-filter', data.name);
+                          onSwitchTab('tab-transacoes');
+                        }
+                      }}
+                      style={{ cursor: 'pointer' }}
                     >
                       {pieData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -191,13 +202,13 @@ export default function DashboardView({ fetchWithAuth, setToast, onSwitchTab }) 
 
         {/* Top Holdings Bar Chart */}
         <div className="glass-panel p-6 rounded-2xl flex flex-col">
-          <h3 className="text-sm font-bold text-zinc-300 mb-6">Maiores Posições em Carteira</h3>
+          <h3 className="text-sm font-bold text-zinc-300 mb-6">Maiores Posições em Carteira (Clique para Filtrar)</h3>
           {barData.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-sm">
               Nenhum ativo alocado no momento.
             </div>
           ) : (
-            <div className="flex-1 h-[300px]">
+            <div className="flex-1 h-[380px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
                   <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} />
@@ -205,7 +216,17 @@ export default function DashboardView({ fetchWithAuth, setToast, onSwitchTab }) 
                     formatter={(val) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     contentStyle={{ background: '#12121f', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px' }}
                   />
-                  <Bar dataKey="Valor" radius={[4, 4, 0, 0]}>
+                  <Bar 
+                    dataKey="Valor" 
+                    radius={[4, 4, 0, 0]}
+                    onClick={(data) => {
+                      if (data && data.name) {
+                        localStorage.setItem('transaction-filter', data.name);
+                        onSwitchTab('tab-transacoes');
+                      }
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
                     {barData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill="#6366f1" />
                     ))}

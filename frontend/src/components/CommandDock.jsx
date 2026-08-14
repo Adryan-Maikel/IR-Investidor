@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Shuffle, ArrowRightLeft, Tags, HelpCircle, GripHorizontal, ChevronRight, Sparkles, Terminal } from 'lucide-react';
 
-export default function CommandDock({ onAction, isOpenInitially = false }) {
-  const [isMinimized, setIsMinimized] = useState(!isOpenInitially);
+export default function CommandDock({ onAction, isMinimized, setIsMinimized }) {
   const [position, setPosition] = useState({ x: window.innerWidth - 320, y: 150 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
@@ -70,24 +69,7 @@ export default function CommandDock({ onAction, isOpenInitially = false }) {
   ];
 
   if (isMinimized) {
-    return (
-      <div 
-        ref={dockRef}
-        style={{ left: `${position.x}px`, top: `${position.y}px` }}
-        className="fixed z-40 drag-handle cursor-grab active:cursor-grabbing group animate-fade-in"
-      >
-        <button
-          onClick={() => setIsMinimized(false)}
-          className="w-14 h-14 rounded-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 shadow-2xl flex items-center justify-center border border-white/20 text-white transition-all hover:scale-110 active:scale-95 duration-300 relative group-hover:glow-primary"
-        >
-          <Terminal className="w-6 h-6 animate-pulse" />
-          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500"></span>
-          </span>
-        </button>
-      </div>
-    );
+    return null;
   }
 
   return (

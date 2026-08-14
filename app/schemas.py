@@ -81,6 +81,14 @@ class TickerMetadata(BaseModel):
     razao_social: Optional[str] = None
 
 
+class TickerCreate(BaseModel):
+    code: str
+    name: str
+    cnpj: Optional[str] = None
+    category: str = "Ações"
+    razao_social: Optional[str] = None
+
+
 class TickerResponse(BaseModel):
     code: str
     name: str

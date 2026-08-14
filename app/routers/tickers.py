@@ -9,7 +9,7 @@ from typing import Dict
 
 from app.dependencies import get_db, get_current_user
 from app.models import User, Ticker
-from app.schemas import TickerMetadata
+from app.schemas import TickerMetadata, TickerCreate
 
 router = APIRouter(prefix="/api/tickers", tags=["Tickers"])
 
@@ -30,6 +30,45 @@ def get_tickers(
             razao_social=t.razao_social or t.name
         ) for t in tickers
     }
+
+
+@router.post("", status_code=status.HTTP_200_OK)
+def create_ticker(
+    data: TickerCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Cria ou atualiza os metadados de um ativo do usuário via POST."""
+    ticker_code = data.code.upper().strip()
+    if not ticker_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Código do ticker é obrigatório."
+        )
+    
+    existing_ticker = db.query(Ticker).filter(
+        Ticker.user_id == current_user.id,
+        Ticker.code == ticker_code
+    ).first()
+    
+    if existing_ticker:
+        existing_ticker.name = data.name
+        existing_ticker.cnpj = data.cnpj
+        existing_ticker.category = data.category
+        existing_ticker.razao_social = data.razao_social or data.name
+    else:
+        new_ticker = Ticker(
+            user_id=current_user.id,
+            code=ticker_code,
+            name=data.name,
+            cnpj=data.cnpj,
+            category=data.category,
+            razao_social=data.razao_social or data.name
+        )
+        db.add(new_ticker)
+        
+    db.commit()
+    return {"message": f"Ativo {ticker_code} cadastrado com sucesso!"}
 
 
 @router.put("/{ticker}", status_code=status.HTTP_200_OK)
