@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, LayoutDashboard, Wallet, RefreshCw, Layers, Award, FileText, Calendar, LogOut, Bell, Settings, Edit3, Terminal } from 'lucide-react';
+import { Sparkles, LayoutDashboard, Wallet, RefreshCw, Layers, Award, FileText, Calendar, LogOut, Bell, Settings, Edit3, ChevronDown, ChevronRight } from 'lucide-react';
 import AuthView from './views/AuthView';
 import DashboardView from './views/DashboardView';
 import HoldingsView from './views/HoldingsView';
@@ -9,13 +9,14 @@ import IrMensalView from './views/IrMensalView';
 import FiiFiagroView from './views/FiiFiagroView';
 import Toast from './components/Toast';
 import Modal from './components/Modal';
-import CommandDock from './components/CommandDock';
+
 import TickerPicker from './components/TickerPicker';
 import CurrencyInput from './components/CurrencyInput';
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || '');
   const [activeTab, setActiveTab] = useState('tab-dashboard');
+  const [bensSubTab, setBensSubTab] = useState('current'); // 'current' | 'yearly'
   const [toast, setToast] = useState(null);
   
   // Notification bell & Inconsistencies states
@@ -54,8 +55,7 @@ export default function App() {
   // Category Colors
   const [categoryColors, setCategoryColors] = useState({});
 
-  // Command Dock state
-  const [isDockMinimized, setIsDockMinimized] = useState(false);
+
 
   // Helper fetch function that automatically injects the token
   const fetchWithAuth = async (url, options = {}) => {
@@ -423,9 +423,7 @@ export default function App() {
     }
   };
 
-  const handleDockAction = (actionId) => {
-    window.dispatchEvent(new CustomEvent('open-global-modal', { detail: actionId }));
-  };
+
 
   if (!token) {
     return (
@@ -444,16 +442,24 @@ export default function App() {
 
   // Define tab configuration
   const tabs = [
-    { id: 'tab-dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
-    { id: 'tab-bens', label: 'Bens e Direitos', icon: <Wallet className="w-4 h-4" /> },
-    { id: 'tab-transacoes', label: 'Transações', icon: <Layers className="w-4 h-4" /> },
-    { id: 'tab-operacoes', label: 'DARF/Vendas', icon: <Award className="w-4 h-4" /> },
-    { id: 'tab-ir-mensal', label: 'IR Mensal', icon: <FileText className="w-4 h-4" /> },
-    { id: 'tab-fii-fiagro', label: 'FIIs/Fiagro', icon: <Calendar className="w-4 h-4" /> }
+    { id: 'tab-dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-3.5 h-3.5" /> },
+    {
+      id: 'tab-bens',
+      label: 'Bens e Direitos',
+      icon: <Wallet className="w-3.5 h-3.5" />,
+      children: [
+        { id: 'current', label: 'Posição Atual' },
+        { id: 'yearly', label: 'Tabela Anual (31/12)' },
+      ]
+    },
+    { id: 'tab-transacoes', label: 'Transações', icon: <Layers className="w-3.5 h-3.5" /> },
+    { id: 'tab-operacoes', label: 'DARF/Vendas', icon: <Award className="w-3.5 h-3.5" /> },
+    { id: 'tab-ir-mensal', label: 'IR Mensal', icon: <FileText className="w-3.5 h-3.5" /> },
+    { id: 'tab-fii-fiagro', label: 'FIIs/Fiagro', icon: <Calendar className="w-3.5 h-3.5" /> }
   ];
 
   return (
-    <div className="min-h-screen bg-[#0b0b14] flex flex-col overflow-x-hidden">
+    <div className="h-screen bg-[#0b0b14] flex flex-col overflow-hidden">
       {/* Top Header navbar */}
       <header className="sticky top-0 z-30 glass-panel border-b border-white/5 py-3.5 px-6 md:px-10 flex justify-between items-center shadow-xl">
         <div className="flex items-center gap-2">
@@ -505,53 +511,64 @@ export default function App() {
       </header>
 
       {/* Main content body with Side menu navigation */}
-      <div className="flex-1 w-full px-5 md:px-8 lg:px-10 py-7 flex flex-col md:flex-row gap-6">
+      <div className="flex-1 overflow-hidden w-full flex flex-col md:flex-row">
         {/* Sidebar Nav */}
-        <aside className="w-full md:w-52 flex-shrink-0">
-          <div className="glass-panel p-3 rounded-2xl space-y-1 sticky top-20 bg-black/30">
+        <aside className="w-full md:w-52 flex-shrink-0 overflow-y-auto">
+          <div className="glass-panel p-3 rounded-2xl space-y-1 m-5 md:ml-8 lg:ml-10 md:mr-0 mt-7 bg-black/30">
             <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider px-3 mb-2">Navegação</p>
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all duration-200 ${
-                  activeTab === tab.id 
-                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-900/40 scale-[1.01]' 
-                    : 'text-zinc-400 hover:bg-white/[0.06] hover:text-white hover:translate-x-0.5'
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
+            {tabs.map(tab => {
+              const isActive = activeTab === tab.id;
+              const hasChildren = !!tab.children;
+              const isExpanded = isActive && hasChildren;
 
-            {/* Premium Dock integration toggle */}
-            <div className="pt-3.5 border-t border-white/5 mt-3">
-              <button
-                onClick={() => setIsDockMinimized(!isDockMinimized)}
-                className={`w-full px-4 py-3 rounded-xl text-xs font-bold flex items-center justify-between transition-all duration-300 ${
-                  !isDockMinimized 
-                    ? 'bg-indigo-600/10 border border-indigo-500/10 text-indigo-400' 
-                    : 'bg-gradient-to-r from-indigo-600 to-violet-600 border border-white/10 text-white shadow-lg hover:scale-[1.02] active:scale-95 cursor-pointer'
-                }`}
-                title={!isDockMinimized ? "Minimizar/Recolher comandos flutuantes" : "Expandir/Flutuar comandos flutuantes"}
-              >
-                <div className="flex items-center gap-3">
-                  <Terminal className="w-4 h-4" />
-                  <span>Comandos Rápidos</span>
+              return (
+                <div key={tab.id}>
+                  <button
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      if (hasChildren && !isActive) setBensSubTab('current');
+                    }}
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all duration-200 ${
+                      isActive
+                        ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-900/40'
+                        : 'text-zinc-400 hover:bg-white/[0.06] hover:text-white hover:translate-x-0.5'
+                    }`}
+                  >
+                    {tab.icon}
+                    <span className="flex-1 text-left">{tab.label}</span>
+                    {hasChildren && (
+                      isExpanded
+                        ? <ChevronDown className="w-3 h-3 opacity-70" />
+                        : <ChevronRight className="w-3 h-3 opacity-40" />
+                    )}
+                  </button>
+
+                  {/* Sub-items expandidos */}
+                  {isExpanded && (
+                    <div className="ml-3 mt-0.5 space-y-0.5 border-l border-white/[0.07] pl-3">
+                      {tab.children.map(child => (
+                        <button
+                          key={child.id}
+                          onClick={() => setBensSubTab(child.id)}
+                          className={`w-full px-3 py-2 rounded-lg text-[11px] font-semibold text-left transition-all duration-150 ${
+                            bensSubTab === child.id
+                              ? 'text-indigo-300 bg-indigo-500/10'
+                              : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]'
+                          }`}
+                        >
+                          {child.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider ${
-                  !isDockMinimized ? 'bg-indigo-500/20 text-indigo-300' : 'bg-white/20 text-white animate-pulse'
-                }`}>
-                  {!isDockMinimized ? 'Ativo' : 'Flutuar'}
-                </span>
-              </button>
-            </div>
+              );
+            })}
           </div>
         </aside>
 
-        {/* View content panel */}
-        <main className="flex-1 min-w-0 overflow-x-hidden">
+        {/* View content panel — único elemento com scroll */}
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden px-5 md:px-8 lg:pr-10 py-7">
           {activeTab === 'tab-dashboard' && (
             <DashboardView 
               fetchWithAuth={fetchWithAuth} 
@@ -560,9 +577,11 @@ export default function App() {
             />
           )}
           {activeTab === 'tab-bens' && (
-            <HoldingsView 
-              fetchWithAuth={fetchWithAuth} 
-              setToast={setToast} 
+            <HoldingsView
+              fetchWithAuth={fetchWithAuth}
+              setToast={setToast}
+              activeSubTab={bensSubTab}
+              setActiveSubTab={setBensSubTab}
             />
           )}
           {activeTab === 'tab-transacoes' && (
@@ -592,12 +611,7 @@ export default function App() {
         </main>
       </div>
 
-      {/* Global Floating Command Dock Hub */}
-      <CommandDock 
-        onAction={handleDockAction} 
-        isMinimized={isDockMinimized} 
-        setIsMinimized={setIsDockMinimized} 
-      />
+
 
       {/* Global Toast component */}
       {toast && (
