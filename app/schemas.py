@@ -127,6 +127,14 @@ class Holding(BaseModel):
     quantity: float
     average_price: float
     total_invested: float
+    name: Optional[str] = None
+    cnpj: Optional[str] = None
+    razao_social: Optional[str] = None
+    is_alienated: bool = False
+    last_alienation_date: Optional[str] = None
+    last_avg_price: Optional[float] = 0.0
+    total_bought_quantity: Optional[float] = 0.0
+    total_sold_quantity: Optional[float] = 0.0
 
 
 # --- Configurações ---

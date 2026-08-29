@@ -15,7 +15,7 @@ router = APIRouter(prefix="", tags=["Holdings"])
 
 
 def calculate_holdings(transactions: List[Transaction], tickers_metadata: Dict[str, dict]) -> List[Holding]:
-    """Calcula o preço médio e custo total das transações de forma cronológica."""
+    """Calcula o preço médio, custo total e histórico de alienação das transações de forma cronológica."""
     holdings_dict = {}
     
     # Prioridade para operações no mesmo dia: Comprar/Recompensa (1) -> Desdobramento (2) -> Grupamento (2) -> Incorporacao (3) -> Vender (4)
@@ -33,73 +33,134 @@ def calculate_holdings(transactions: List[Transaction], tickers_metadata: Dict[s
         action = tx.action.lower()
         
         if ticker not in holdings_dict:
-            category = "Ações"
-            if tickers_metadata and ticker in tickers_metadata:
-                category = tickers_metadata[ticker].get("category", "Ações")
-            holdings_dict[ticker] = {"quantity": 0, "total_cost": 0, "category": category}
+            meta = tickers_metadata.get(ticker, {}) if tickers_metadata else {}
+            holdings_dict[ticker] = {
+                "quantity": 0.0,
+                "total_cost": 0.0,
+                "category": meta.get("category", "Ações"),
+                "name": meta.get("name", ticker),
+                "cnpj": meta.get("cnpj", ""),
+                "razao_social": meta.get("razao_social", ""),
+                "last_avg_price": 0.0,
+                "last_alienation_date": None,
+                "total_bought_quantity": 0.0,
+                "total_sold_quantity": 0.0
+            }
             
         if action in ["comprar", "recompensa"]:
             holdings_dict[ticker]["quantity"] += qty
             holdings_dict[ticker]["total_cost"] += (qty * price) + taxes
+            holdings_dict[ticker]["total_bought_quantity"] += qty
+            holdings_dict[ticker]["last_avg_price"] = (
+                holdings_dict[ticker]["total_cost"] / holdings_dict[ticker]["quantity"]
+                if holdings_dict[ticker]["quantity"] > 0 else price
+            )
+            holdings_dict[ticker]["last_alienation_date"] = None
         elif action == "vender":
-            # Usar tolerância para evitar resíduos de ponto flutuante
-            if (qty - holdings_dict[ticker]["quantity"]) > 1e-10:
-                avg_price = holdings_dict[ticker]["total_cost"] / holdings_dict[ticker]["quantity"] if holdings_dict[ticker]["quantity"] > 0 else price
-            else:
-                avg_price = holdings_dict[ticker]["total_cost"] / holdings_dict[ticker]["quantity"] if holdings_dict[ticker]["quantity"] > 0 else price
-            
+            current_qty = holdings_dict[ticker]["quantity"]
+            avg_price = (
+                holdings_dict[ticker]["total_cost"] / current_qty
+                if current_qty > 0 else (holdings_dict[ticker]["last_avg_price"] or price)
+            )
+            holdings_dict[ticker]["last_avg_price"] = avg_price
             holdings_dict[ticker]["quantity"] -= qty
+            holdings_dict[ticker]["total_sold_quantity"] += qty
             
-            # Se zerou ou ficou negativo (devido a imprecisão), zera o custo
+            # Se zerou ou ficou negativo (devido a resíduo/tolerância), zera o custo e marca a data da alienação
             if holdings_dict[ticker]["quantity"] <= 1e-10:
-                holdings_dict[ticker]["quantity"] = 0
-                holdings_dict[ticker]["total_cost"] = 0
+                holdings_dict[ticker]["quantity"] = 0.0
+                holdings_dict[ticker]["total_cost"] = 0.0
+                holdings_dict[ticker]["last_alienation_date"] = tx.date
             else:
                 holdings_dict[ticker]["total_cost"] = holdings_dict[ticker]["quantity"] * avg_price
 
         elif action == "desdobramento":
             holdings_dict[ticker]["quantity"] *= qty
+            if holdings_dict[ticker]["quantity"] > 0:
+                holdings_dict[ticker]["last_avg_price"] = (
+                    holdings_dict[ticker]["total_cost"] / holdings_dict[ticker]["quantity"]
+                )
+            elif qty > 0 and holdings_dict[ticker]["last_avg_price"]:
+                holdings_dict[ticker]["last_avg_price"] /= qty
+
         elif action == "grupamento":
             if qty > 0:
                 holdings_dict[ticker]["quantity"] /= qty
+                if holdings_dict[ticker]["quantity"] > 0:
+                    holdings_dict[ticker]["last_avg_price"] = (
+                        holdings_dict[ticker]["total_cost"] / holdings_dict[ticker]["quantity"]
+                    )
+                elif holdings_dict[ticker]["last_avg_price"]:
+                    holdings_dict[ticker]["last_avg_price"] *= qty
+
         elif action == "incorporacao":
             ticker_dest = tx.ticker_destino.upper().strip() if tx.ticker_destino else ""
             factor = tx.fator_conversao or qty
             
             if ticker_dest:
                 if ticker_dest not in holdings_dict:
-                    category = "Ações"
-                    if tickers_metadata and ticker_dest in tickers_metadata:
-                        category = tickers_metadata[ticker_dest].get("category", "Ações")
-                    holdings_dict[ticker_dest] = {"quantity": 0, "total_cost": 0, "category": category}
+                    meta_dest = tickers_metadata.get(ticker_dest, {}) if tickers_metadata else {}
+                    holdings_dict[ticker_dest] = {
+                        "quantity": 0.0,
+                        "total_cost": 0.0,
+                        "category": meta_dest.get("category", "Ações"),
+                        "name": meta_dest.get("name", ticker_dest),
+                        "cnpj": meta_dest.get("cnpj", ""),
+                        "razao_social": meta_dest.get("razao_social", ""),
+                        "last_avg_price": 0.0,
+                        "last_alienation_date": None,
+                        "total_bought_quantity": 0.0,
+                        "total_sold_quantity": 0.0
+                    }
                 
                 old_qty = holdings_dict[ticker]["quantity"]
                 old_cost = holdings_dict[ticker]["total_cost"]
+                avg_price = (
+                    old_cost / old_qty
+                    if old_qty > 0 else (holdings_dict[ticker]["last_avg_price"] or price)
+                )
+                holdings_dict[ticker]["last_avg_price"] = avg_price
                 
                 # Transfere o custo total e calcula quantidade proporcional
                 holdings_dict[ticker_dest]["quantity"] += (old_qty * factor)
                 holdings_dict[ticker_dest]["total_cost"] += old_cost
+                if holdings_dict[ticker_dest]["quantity"] > 0:
+                    holdings_dict[ticker_dest]["last_avg_price"] = (
+                        holdings_dict[ticker_dest]["total_cost"] / holdings_dict[ticker_dest]["quantity"]
+                    )
+                holdings_dict[ticker_dest]["last_alienation_date"] = None
                 
-                holdings_dict[ticker]["quantity"] = 0
-                holdings_dict[ticker]["total_cost"] = 0
+                holdings_dict[ticker]["quantity"] = 0.0
+                holdings_dict[ticker]["total_cost"] = 0.0
+                holdings_dict[ticker]["last_alienation_date"] = tx.date
                 
     results = []
     for ticker, values in holdings_dict.items():
         qty = round(values["quantity"], 10)
         if abs(qty) < 1e-10:
-            qty = 0
+            qty = 0.0
         
         cost = round(values["total_cost"], 2)
         if qty == 0:
-            cost = 0
+            cost = 0.0
             
-        avg_p = cost / qty if qty > 0 else 0
+        avg_p = (cost / qty) if qty > 0 else values.get("last_avg_price", 0.0)
+        is_alienated = (qty == 0.0)
+        
         results.append(Holding(
             ticker=ticker, 
             category=values["category"], 
+            name=values.get("name") or ticker,
+            cnpj=values.get("cnpj") or "",
+            razao_social=values.get("razao_social") or "",
             quantity=qty, 
             average_price=round(avg_p, 4), 
-            total_invested=cost
+            total_invested=cost,
+            is_alienated=is_alienated,
+            last_alienation_date=values.get("last_alienation_date"),
+            last_avg_price=round(values.get("last_avg_price", 0.0), 4),
+            total_bought_quantity=round(values.get("total_bought_quantity", 0.0), 6),
+            total_sold_quantity=round(values.get("total_sold_quantity", 0.0), 6)
         ))
     return results
 
@@ -109,10 +170,17 @@ def get_holdings(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Calcula a carteira atual de investimentos do usuário."""
+    """Calcula a carteira atual de investimentos do usuário, incluindo posições em aberto e alienadas."""
     transactions = db.query(Transaction).filter(Transaction.user_id == current_user.id).all()
     tickers = db.query(Ticker).filter(Ticker.user_id == current_user.id).all()
-    tickers_metadata = {t.code.upper(): {"category": t.category} for t in tickers}
+    tickers_metadata = {
+        t.code.upper(): {
+            "category": t.category,
+            "name": t.name,
+            "cnpj": t.cnpj,
+            "razao_social": t.razao_social or t.name
+        } for t in tickers
+    }
     
     return calculate_holdings(transactions, tickers_metadata)
 
@@ -125,7 +193,14 @@ def get_yearly_holdings(
     """Calcula as posições anuais da carteira (posição fechada em 31/12 de cada ano)."""
     transactions = db.query(Transaction).filter(Transaction.user_id == current_user.id).all()
     tickers = db.query(Ticker).filter(Ticker.user_id == current_user.id).all()
-    tickers_metadata = {t.code.upper(): {"category": t.category} for t in tickers}
+    tickers_metadata = {
+        t.code.upper(): {
+            "category": t.category,
+            "name": t.name,
+            "cnpj": t.cnpj,
+            "razao_social": t.razao_social or t.name
+        } for t in tickers
+    }
     
     if not transactions:
         return []
@@ -135,7 +210,15 @@ def get_yearly_holdings(
     
     all_tickers_codes = sorted(list(set([tx.ticker.upper().strip() for tx in transactions])))
     for ticker in all_tickers_codes:
-        results[ticker] = {"ticker": ticker, "years": {}}
+        meta = tickers_metadata.get(ticker, {})
+        results[ticker] = {
+            "ticker": ticker,
+            "name": meta.get("name", ticker),
+            "cnpj": meta.get("cnpj", ""),
+            "razao_social": meta.get("razao_social", ""),
+            "category": meta.get("category", "Ações"),
+            "years": {}
+        }
         
     for year in all_years:
         end_date = f"{year}-12-31"
@@ -146,7 +229,12 @@ def get_yearly_holdings(
             results[h.ticker]["years"][year] = {
                 "quantity": h.quantity,
                 "value": h.total_invested,
-                "category": h.category
+                "average_price": h.average_price,
+                "last_avg_price": h.last_avg_price,
+                "category": h.category,
+                "is_alienated": h.is_alienated,
+                "last_alienation_date": h.last_alienation_date
             }
             
     return list(results.values())
+
