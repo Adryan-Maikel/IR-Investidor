@@ -58,28 +58,46 @@ export default function HoldingsView({ fetchWithAuth, setToast, activeSubTab, se
     }
   };
 
+  const getIRPFGroupCode = (category, ticker) => {
+    switch ((category || '').toLowerCase()) {
+      case 'ações': return { grupo: '03', codigo: '01', desc: 'Ações' };
+      case 'bdrs': return { grupo: '04', codigo: '04', desc: 'BDRs' };
+      case 'fiis': return { grupo: '07', codigo: '03', desc: 'FIIs' };
+      case 'cripto':
+        if (ticker === 'BTC') return { grupo: '08', codigo: '01', desc: 'Bitcoin (BTC)' };
+        if (ticker === 'USDC' || ticker === 'USDT' || ticker === 'DAI' || ticker === 'BUSD') return { grupo: '08', codigo: '03', desc: 'Stablecoins' };
+        return { grupo: '08', codigo: '02', desc: 'Altcoins' };
+      default: return { grupo: '03', codigo: '01', desc: 'Ações' };
+    }
+  };
+
   const generateIRDescription = (h) => {
     const category = (h.category || 'Ações').toUpperCase();
     const company = h.razao_social || h.name;
     const companyInfo = company && company !== h.ticker ? ` (${company})` : '';
-    const cnpjInfo = h.cnpj ? ` CADASTRADO NO CNPJ: ${h.cnpj}.` : '';
+    const cnpjInfo = h.cnpj ? ` CNPJ: ${h.cnpj}.` : '';
+    const irpfCode = getIRPFGroupCode(h.category, h.ticker);
+    const codePrefix = `[Grupo ${irpfCode.grupo} - Código ${irpfCode.codigo}] `;
 
     if (!h.is_alienated && h.quantity > 0) {
-      return `${category} - ${h.ticker}${companyInfo} - QUANTIDADE: ${h.quantity.toLocaleString('pt-BR', { maximumFractionDigits: 6 })} COTAS/AÇÕES. CUSTO MÉDIO DE AQUISIÇÃO: ${h.average_price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}. CUSTO TOTAL ACUMULADO: ${h.total_invested.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.${cnpjInfo}`;
+      return `${codePrefix}${category} - ${h.ticker}${companyInfo} -${cnpjInfo} QUANTIDADE: ${h.quantity.toLocaleString('pt-BR', { maximumFractionDigits: 6 })} COTAS/AÇÕES. CUSTO MÉDIO DE AQUISIÇÃO: ${h.average_price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}. CUSTO TOTAL ACUMULADO: ${h.total_invested.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.`;
     } else {
+      let alienationYear = '';
       let dateFormatted = '';
       if (h.last_alienation_date) {
         const parts = h.last_alienation_date.split('-');
         if (parts.length === 3) {
+          alienationYear = parts[0];
           dateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
         }
       }
       const dateText = dateFormatted ? ` EM ${dateFormatted}` : '';
+      const yearText = alienationYear || new Date().getFullYear().toString();
       const soldQty = h.total_sold_quantity > 0 ? h.total_sold_quantity : h.quantity;
       const qtyText = soldQty > 0 ? ` QUANTIDADE TOTAL ALIENADA: ${soldQty.toLocaleString('pt-BR', { maximumFractionDigits: 6 })} COTAS/AÇÕES.` : '';
       const avgPrice = (h.last_avg_price || h.average_price || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
       
-      return `${category} - ${h.ticker}${companyInfo} -${cnpjInfo} POSIÇÃO TOTALMENTE ALIENADA${dateText}.${qtyText} CUSTO MÉDIO DE AQUISIÇÃO: ${avgPrice}. SITUAÇÃO EM 31/12: R$ 0,00.`;
+      return `${codePrefix}${category} - ${h.ticker}${companyInfo} -${cnpjInfo} POSIÇÃO TOTALMENTE ALIENADA${dateText}.${qtyText} CUSTO MÉDIO DE AQUISIÇÃO: ${avgPrice}. SITUAÇÃO EM 31/12/${yearText}: R$ 0,00.`;
     }
   };
 

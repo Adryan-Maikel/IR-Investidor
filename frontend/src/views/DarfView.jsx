@@ -159,16 +159,19 @@ export default function DarfView({ fetchWithAuth, setToast }) {
         m.details.push(s);
       });
 
-      // 5. Carry-forward losses pools
+      // 5. Carry-forward losses pools (separados por categoria fiscal - IN RFB 1585/2015)
+      // - swing: ações + BDRs swing trade (ações isentas quando vendas ≤ R$20k, BDRs NUNCA isentos)
+      // - fiis: FIIs swing + day trade (pool unificado - Lei 11.196/2005)
+      // - dayTrade: ações + BDRs day trade apenas (sem FIIs)
+      // - cripto: criptoativos (isentos quando vendas ≤ R$35k)
       const accLoss = { swing: 0, fiis: 0, dayTrade: 0, cripto: 0 };
       const chronoKeys = Object.keys(monthlySummary).sort();
 
       chronoKeys.forEach(monthKey => {
         const d = monthlySummary[monthKey];
-        const swingProfit = d.swingAcoes + d.swingBDRs;
-        const dtProfit = d.dayTradeAcoes + d.dayTradeBDRs + d.dayTradeFIIs;
-        const fiiProfit = d.swingFIIs;
-        const cryptoProfit = d.cripto;
+
+        const isAcoesExempt = d.totalVendasSwingAcoes <= 20000;
+        const isCryptoExempt = d.totalVendasCripto <= 35000;
 
         const applyCarry = (profit, pool) => {
           const net = profit + accLoss[pool];
@@ -181,53 +184,62 @@ export default function DarfView({ fetchWithAuth, setToast }) {
           }
         };
 
-        const isSwingAcoesExempt = d.totalVendasSwingAcoes <= 20000;
-        const isCriptoExempt = d.totalVendasCripto <= 35000;
-
-        let swingTaxable;
-        if (isSwingAcoesExempt && d.swingBDRs === 0) {
-          swingTaxable = 0;
+        // === SWING TRADE (15%) — Ações + BDRs ===
+        // BDRs NÃO têm isenção de R$20k (IN RFB 1585/2015, Art. 65-A)
+        // Quando ações isentas: prejuízo de ações NÃO acumula, só BDRs entram no pool
+        let swingTaxableProfit;
+        if (isAcoesExempt) {
+          // Ações isentas: apenas BDRs participam do pool swing
+          swingTaxableProfit = d.swingBDRs;
         } else {
-          if (swingProfit < 0) {
-            accLoss.swing += swingProfit;
-            swingTaxable = 0;
-          } else {
-            swingTaxable = applyCarry(swingProfit, 'swing');
+          // Vendas > R$20k: ações + BDRs combinados
+          swingTaxableProfit = d.swingAcoes + d.swingBDRs;
+        }
+
+        let swingTaxable = 0;
+        if (swingTaxableProfit < 0) {
+          accLoss.swing += swingTaxableProfit;
+        } else if (swingTaxableProfit > 0) {
+          swingTaxable = applyCarry(swingTaxableProfit, 'swing');
+        }
+
+        // === FIIs/Fiagro (20%) — Swing + Day Trade unificados ===
+        // Prejuízos de FIIs compensam apenas ganhos de FIIs (Lei 11.196/2005)
+        const fiiTotal = d.swingFIIs + d.dayTradeFIIs;
+        let fiiTaxable = 0;
+        if (fiiTotal < 0) {
+          accLoss.fiis += fiiTotal;
+        } else if (fiiTotal > 0) {
+          fiiTaxable = applyCarry(fiiTotal, 'fiis');
+        }
+
+        // === DAY TRADE (20%) — Apenas ações + BDRs ===
+        // Day Trade de FIIs vai para o pool de FIIs (acima)
+        const dtTotal = d.dayTradeAcoes + d.dayTradeBDRs;
+        let dtTaxable = 0;
+        if (dtTotal < 0) {
+          accLoss.dayTrade += dtTotal;
+        } else if (dtTotal > 0) {
+          dtTaxable = applyCarry(dtTotal, 'dayTrade');
+        }
+
+        // === CRIPTO (15%) ===
+        let cryptoTaxable = 0;
+        if (!isCryptoExempt) {
+          if (d.cripto < 0) {
+            accLoss.cripto += d.cripto;
+          } else if (d.cripto > 0) {
+            cryptoTaxable = applyCarry(d.cripto, 'cripto');
           }
         }
 
-        let fiiTaxable;
-        if (fiiProfit < 0) {
-          accLoss.fiis += fiiProfit;
-          fiiTaxable = 0;
-        } else {
-          fiiTaxable = applyCarry(fiiProfit, 'fiis');
-        }
-
-        let dtTaxable;
-        if (dtProfit < 0) {
-          accLoss.dayTrade += dtProfit;
-          dtTaxable = 0;
-        } else {
-          dtTaxable = applyCarry(dtProfit, 'dayTrade');
-        }
-
-        let cryptoTaxable;
-        if (isCriptoExempt) {
-          cryptoTaxable = 0;
-        } else {
-          if (cryptoProfit < 0) {
-            accLoss.cripto += cryptoProfit;
-            cryptoTaxable = 0;
-          } else {
-            cryptoTaxable = applyCarry(cryptoProfit, 'cripto');
-          }
-        }
-
-        d._swingProfit = swingProfit;
-        d._fiiProfit = fiiProfit;
-        d._dtProfit = dtProfit;
-        d._cryptoProfit = cryptoProfit;
+        // Valores para exibição
+        d._swingProfit = swingTaxableProfit;
+        d._swingAcoesProfit = d.swingAcoes;
+        d._swingBDRsProfit = d.swingBDRs;
+        d._fiiProfit = fiiTotal;
+        d._dtProfit = dtTotal;
+        d._cryptoProfit = d.cripto;
         d._swingTaxable = swingTaxable;
         d._fiiTaxable = fiiTaxable;
         d._dtTaxable = dtTaxable;
@@ -237,8 +249,8 @@ export default function DarfView({ fetchWithAuth, setToast }) {
         d._dtTax = dtTaxable > 0 ? dtTaxable * 0.20 : 0;
         d._cryptoTax = cryptoTaxable > 0 ? cryptoTaxable * 0.15 : 0;
         d._totalDarf = d._swingTax + d._fiiTax + d._dtTax + d._cryptoTax;
-        d._isSwingExempt = isSwingAcoesExempt && d.swingBDRs === 0;
-        d._isCryptoExempt = isCriptoExempt;
+        d._isAcoesExempt = isAcoesExempt;
+        d._isCryptoExempt = isCryptoExempt;
         d._accLossSnapshot = { ...accLoss };
       });
 
@@ -324,7 +336,11 @@ export default function DarfView({ fetchWithAuth, setToast }) {
                 >
                   <div>
                     <h3 className="text-base font-bold text-white">{monthName} de {year}</h3>
-                    <span className="text-xs text-zinc-500">Volume Vendas Ações: {report.totalVendasSwingAcoes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                    <span className="text-xs text-zinc-500">
+                      Ações: {report.totalVendasSwingAcoes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      {report.totalVendasBDRs > 0 && <> · BDRs: {report.totalVendasBDRs.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</>}
+                      {report.totalVendasFIIs > 0 && <> · FIIs: {report.totalVendasFIIs.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</>}
+                    </span>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
@@ -344,16 +360,28 @@ export default function DarfView({ fetchWithAuth, setToast }) {
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                       {/* Swing Trade */}
                       <div className="bg-black/20 p-4 rounded-xl border border-white/5">
-                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Swing Trade (15%)</p>
+                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Swing Trade Ações/BDRs (15%)</p>
                         <p className={`text-base font-bold mt-1 ${profitColors(report._swingProfit)}`}>
                           {report._swingProfit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </p>
-                        <p className="text-[9px] text-zinc-500 mt-1">{report._isSwingExempt ? 'Isento (< R$20k)' : `DARF: ${report._swingTax.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}</p>
+                        <p className="text-[9px] text-zinc-500 mt-1">
+                          {report._isAcoesExempt
+                            ? (report._swingBDRsProfit !== 0
+                              ? `Ações isentas (≤R$20k) · BDRs DARF: ${report._swingTax.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                              : 'Ações isentas (vendas ≤ R$20k)')
+                            : `DARF: ${report._swingTax.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
+                        </p>
+                        {report._isAcoesExempt && (report._swingAcoesProfit !== 0 || report._swingBDRsProfit !== 0) && (
+                          <div className="mt-1.5 pt-1.5 border-t border-white/5 text-[8px] text-zinc-600 space-y-0.5">
+                            {report._swingAcoesProfit !== 0 && <p>Ações: {report._swingAcoesProfit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (isento)</p>}
+                            {report._swingBDRsProfit !== 0 && <p>BDRs: {report._swingBDRsProfit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (tributável)</p>}
+                          </div>
+                        )}
                       </div>
 
                       {/* Day Trade */}
                       <div className="bg-black/20 p-4 rounded-xl border border-white/5">
-                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">⚡ Day Trade (20%)</p>
+                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">⚡ Day Trade Ações/BDRs (20%)</p>
                         <p className={`text-base font-bold mt-1 ${profitColors(report._dtProfit)}`}>
                           {report._dtProfit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </p>
@@ -362,7 +390,7 @@ export default function DarfView({ fetchWithAuth, setToast }) {
 
                       {/* FIIs */}
                       <div className="bg-black/20 p-4 rounded-xl border border-white/5">
-                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">FIIs (20%)</p>
+                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">FIIs/Fiagro (20%)</p>
                         <p className={`text-base font-bold mt-1 ${profitColors(report._fiiProfit)}`}>
                           {report._fiiProfit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </p>
