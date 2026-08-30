@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList,
+  AreaChart, Area
 } from 'recharts';
 import {
   Wallet,
@@ -14,13 +15,13 @@ import {
   PieChart as PieIcon,
   BarChart3,
   Search,
-  SlidersHorizontal,
-  ArrowUpRight,
   Receipt,
   Copy,
   Check,
-  Building2,
-  Coins
+  Coins,
+  History,
+  ArrowUpRight,
+  Calendar
 } from 'lucide-react';
 import { getCategoryColor, formatCurrency, formatNumber } from '../utils/categories';
 
@@ -49,15 +50,21 @@ function DashboardSkeleton() {
         ))}
       </div>
 
-      {/* Charts skeleton */}
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-        <div className="glass-panel p-6 rounded-3xl xl:col-span-2">
-          <div className="skeleton w-40 h-4 rounded-full mb-6" />
-          <div className="skeleton w-full rounded-2xl" style={{ height: 300 }} />
+      {/* Charts skeleton (4 of 6 and 2 of 6) */}
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
+        <div className="glass-panel p-6 rounded-3xl lg:col-span-4 flex flex-col justify-between">
+          <div className="skeleton w-52 h-5 rounded-full mb-6" />
+          <div className="skeleton w-full rounded-2xl" style={{ height: 380 }} />
         </div>
-        <div className="glass-panel p-6 rounded-3xl xl:col-span-3">
-          <div className="skeleton w-44 h-4 rounded-full mb-6" />
-          <div className="skeleton w-full rounded-2xl" style={{ height: 300 }} />
+        <div className="lg:col-span-2 flex flex-col gap-6">
+          <div className="glass-panel p-6 rounded-3xl flex-1">
+            <div className="skeleton w-40 h-4 rounded-full mb-6" />
+            <div className="skeleton w-full rounded-2xl" style={{ height: 180 }} />
+          </div>
+          <div className="glass-panel p-6 rounded-3xl flex-1">
+            <div className="skeleton w-36 h-4 rounded-full mb-6" />
+            <div className="skeleton w-full rounded-2xl" style={{ height: 180 }} />
+          </div>
         </div>
       </div>
     </div>
@@ -65,39 +72,28 @@ function DashboardSkeleton() {
 }
 
 // --- KPI Card 2.0 ---
-function KpiCard({ icon: Icon, label, value, subtext, iconColor, iconBg, glowColor, badge, badgeColor }) {
+function KpiCard({ icon: Icon, label, value, subtext, iconColor }) {
   return (
     <div className="kpi flex items-center gap-4 group" style={{ borderColor: iconColor }}>
-      {/* Big prominent icon container on the left */}
       <Icon className="w-9 h-9 icon" style={{ color: iconColor }} />
-      {/* < div
-        className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-105 shadow-md">
-      </div > */}
-
-      {/* Text block beside the icon */}
-      < div className="min-w-0 flex-1" >
+      <div className="min-w-0 flex-1">
         <p className="text-[10px] font-black text-zinc-400 uppercase tracking-wider truncate">
           {label}
         </p>
-        {/* {badge} */}
-
         <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-0.5 truncate">
           {value}
         </h3>
-
-        {
-          subtext && (
-            <p className="text-[11px] text-zinc-400 font-medium mt-0.5 truncate flex items-center gap-1">
-              {subtext}
-            </p>
-          )
-        }
-      </div >
-    </div >
+        {subtext && (
+          <p className="text-[11px] text-zinc-400 font-medium mt-0.5 truncate flex items-center gap-1">
+            {subtext}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
-// --- Custom Chart Tooltip ---
+// --- Custom Tooltip for Allocation & Top 5 ---
 function ChartTooltip({ active, payload, isPrivate }) {
   if (!active || !payload || !payload.length) return null;
   const data = payload[0];
@@ -138,6 +134,229 @@ function ChartTooltip({ active, payload, isPrivate }) {
   );
 }
 
+// --- Custom Tooltip for Evolution Line Chart ---
+function EvolutionTooltip({ active, payload, label, isPrivate }) {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0].payload;
+  const isPositive = data.growth >= 0;
+
+  return (
+    <div className="glass-modal p-4 rounded-2xl shadow-2xl border border-white/10 text-xs min-w-[210px] animate-fade-in">
+      <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-white/10">
+        <span className="font-extrabold text-white text-sm">Ano {label}</span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">
+          {data.assetsCount} {data.assetsCount === 1 ? 'ativo' : 'ativos'}
+        </span>
+      </div>
+      
+      <div className="space-y-2">
+        <div>
+          <p className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider">Patrimônio Acumulado (Custo)</p>
+          <p className="text-base font-black text-white mt-0.5">
+            {formatCurrency(data.total, false, isPrivate)}
+          </p>
+        </div>
+
+        {data.growth !== 0 && (
+          <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px]">
+            <span className="text-zinc-400">Variação vs anterior:</span>
+            <span className={`font-bold flex items-center gap-0.5 ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {isPositive ? '+' : ''}{formatCurrency(data.growth, false, isPrivate)} ({isPositive ? '+' : ''}{data.growthPercent}%)
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- Allocation Donut: clean, proportional and interactive ---
+function AllocationTooltip({ active = false, payload = [], isPrivate = false }) {
+  if (!active || !payload?.length) return null;
+
+  const item = payload[0]?.payload;
+  if (!item) return null;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#0b0b14]/95 px-3.5 py-3 shadow-2xl backdrop-blur-xl min-w-[170px]">
+      <div className="flex items-center gap-2 mb-2">
+        <span
+          className="h-2.5 w-2.5 rounded-full shrink-0"
+          style={{ backgroundColor: item.color, boxShadow: `0 0 12px ${item.color}88` }}
+        />
+        <span className="text-xs font-bold text-white truncate">{item.name}</span>
+      </div>
+      <p className="text-sm font-black text-white tabular-nums">
+        {formatCurrency(item.value, false, isPrivate)}
+      </p>
+      <div className="mt-1.5 flex items-center justify-between gap-4 text-[10px] font-semibold">
+        <span className="text-zinc-500">{item.count} {item.count === 1 ? 'ativo' : 'ativos'}</span>
+        <span style={{ color: item.color }}>{(item.percent * 100).toFixed(1)}% da carteira</span>
+      </div>
+    </div>
+  );
+}
+
+function AllocationDonut({
+  data = [],
+  totalValue = 0,
+  isPrivate = false,
+  selectedCategory = 'ALL',
+  onSelectCategory
+}) {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const visibleData = useMemo(
+    () => data.filter(item => Number(item.value) > 0),
+    [data]
+  );
+
+  if (visibleData.length === 0) {
+    return (
+      <div className="h-64 flex flex-col items-center justify-center text-zinc-500 text-xs text-center p-6">
+        <Layers className="w-8 h-8 text-zinc-600 mb-2 stroke-[1.5]" />
+        <p className="font-semibold">Nenhuma posição alocada</p>
+        <p className="text-[11px] text-zinc-600 mt-0.5">Cadastre compras para ver a divisão.</p>
+      </div>
+    );
+  }
+
+  const selectedIndex = visibleData.findIndex(item => item.name === selectedCategory);
+  const focusIndex = hoveredIndex !== null ? hoveredIndex : selectedIndex;
+  const focusItem = focusIndex >= 0 ? visibleData[focusIndex] : null;
+  const hasSelection = selectedCategory !== 'ALL' && selectedIndex >= 0;
+
+  const toggleCategory = (category) => {
+    if (!onSelectCategory) return;
+    onSelectCategory(selectedCategory === category ? 'ALL' : category);
+  };
+
+  return (
+    <div className="pt-2">
+      <div className="relative h-[220px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={visibleData}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              innerRadius="58%"
+              outerRadius="82%"
+              paddingAngle={2.5}
+              cornerRadius={7}
+              startAngle={90}
+              endAngle={-270}
+              stroke="#0f0f1a"
+              strokeWidth={3}
+              isAnimationActive
+              animationDuration={700}
+              animationEasing="ease-out"
+            >
+              {visibleData.map((item, index) => {
+                const isSelected = selectedCategory === item.name;
+                const isHovered = hoveredIndex === index;
+
+                return (
+                  <Cell
+                    key={`allocation-${item.name}`}
+                    fill={item.color}
+                    fillOpacity={hasSelection && !isSelected ? 0.28 : isHovered ? 1 : 0.9}
+                    stroke={isSelected || isHovered ? item.color : '#0f0f1a'}
+                    strokeWidth={isSelected ? 5 : isHovered ? 4 : 3}
+                    className="cursor-pointer outline-none transition-opacity duration-200"
+                    onMouseEnter={() => setHoveredIndex(index)}
+                    onMouseLeave={() => setHoveredIndex(null)}
+                    onClick={() => toggleCategory(item.name)}
+                  />
+                );
+              })}
+            </Pie>
+            <Tooltip
+              cursor={false}
+              content={<AllocationTooltip isPrivate={isPrivate} />}
+              wrapperStyle={{ outline: 'none', zIndex: 30 }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="max-w-[118px] text-center">
+            <span className="block truncate text-[9px] font-black uppercase tracking-[0.15em] text-zinc-500">
+              {focusItem ? focusItem.name : 'Total alocado'}
+            </span>
+            <span className="mt-1 block text-base font-black tracking-tight text-white tabular-nums">
+              {formatCurrency(focusItem ? focusItem.value : totalValue, true, isPrivate)}
+            </span>
+            <span
+              className="mt-0.5 block text-[10px] font-extrabold tabular-nums"
+              style={{ color: focusItem ? focusItem.color : '#818cf8' }}
+            >
+              {focusItem
+                ? `${(focusItem.percent * 100).toFixed(1)}% da carteira`
+                : `${visibleData.length} ${visibleData.length === 1 ? 'classe' : 'classes'}`}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 mt-1" aria-label="Legenda de alocação por categoria">
+        {visibleData.map((item, index) => {
+          const isSelected = selectedCategory === item.name;
+          const isHovered = hoveredIndex === index;
+
+          return (
+            <button
+              key={`allocation-legend-${item.name}`}
+              type="button"
+              onClick={() => toggleCategory(item.name)}
+              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}
+              aria-pressed={isSelected}
+              title={`${item.name}: ${(item.percent * 100).toFixed(1)}%`}
+              className={`min-w-0 rounded-xl border px-2.5 py-2 text-left transition-all cursor-pointer ${
+                isSelected
+                  ? 'bg-white/[0.07] border-white/15'
+                  : 'bg-white/[0.025] border-white/[0.05] hover:bg-white/[0.055] hover:border-white/10'
+              }`}
+              style={{
+                opacity: hasSelection && !isSelected ? 0.5 : 1,
+                boxShadow: isSelected ? `inset 0 0 0 1px ${item.color}66` : undefined
+              }}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor: item.color,
+                    boxShadow: isSelected || isHovered ? `0 0 10px ${item.color}99` : undefined
+                  }}
+                />
+                <span className="min-w-0 flex-1 truncate text-[10px] font-bold text-zinc-300">
+                  {item.name}
+                </span>
+                <span className="shrink-0 text-[10px] font-black tabular-nums" style={{ color: item.color }}>
+                  {(item.percent * 100).toFixed(1)}%
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {hasSelection && (
+        <button
+          type="button"
+          onClick={() => onSelectCategory?.('ALL')}
+          className="mt-3 w-full rounded-xl border border-indigo-500/15 bg-indigo-500/[0.06] py-2 text-[10px] font-bold text-indigo-300 transition-colors hover:bg-indigo-500/10 cursor-pointer"
+        >
+          Mostrar todas as categorias
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardView({
   fetchWithAuth,
   setToast,
@@ -145,22 +364,23 @@ export default function DashboardView({
   isPrivate = false
 }) {
   const [holdings, setHoldings] = useState([]);
+  const [yearlyHoldings, setYearlyHoldings] = useState([]);
   const [inconsistencies, setInconsistencies] = useState([]);
   const [categoryColors, setCategoryColors] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMetric, setViewMetric] = useState('cost'); // 'cost' | 'market'
   const [copiedTicker, setCopiedTicker] = useState(null);
 
   const loadData = async (showFeedback = false) => {
     if (showFeedback) setIsRefreshing(true);
     try {
-      const [holdingsRes, incRes, settingsRes] = await Promise.all([
+      const [holdingsRes, incRes, settingsRes, yearlyRes] = await Promise.all([
         fetchWithAuth('/api/holdings'),
         fetchWithAuth('/api/check-inconsistencies'),
         fetchWithAuth('/api/settings'),
+        fetchWithAuth('/api/yearly-holdings'),
       ]);
 
       if (holdingsRes.ok) {
@@ -172,6 +392,9 @@ export default function DashboardView({
       if (settingsRes.ok) {
         const settings = await settingsRes.json();
         setCategoryColors(settings.category_colors || {});
+      }
+      if (yearlyRes.ok) {
+        setYearlyHoldings(await yearlyRes.json());
       }
 
       if (showFeedback && setToast) {
@@ -269,11 +492,89 @@ export default function DashboardView({
     }));
   }, [categorySummary]);
 
-  // Top 10 Positions for Bar Chart (Filtered or Global)
+  // Yearly Evolution Data for Historical Line Chart
+  const yearlyEvolutionData = useMemo(() => {
+    if (!yearlyHoldings || yearlyHoldings.length === 0) {
+      if (activeHoldings.length > 0) {
+        const currentYear = new Date().getFullYear().toString();
+        return [{
+          year: currentYear,
+          total: totalInvestedFiltered,
+          assetsCount: filteredHoldings.length,
+          growth: 0,
+          growthPercent: 0
+        }];
+      }
+      return [];
+    }
+
+    const yearsSet = new Set();
+    yearlyHoldings.forEach(item => {
+      if (item.years) {
+        Object.keys(item.years).forEach(y => yearsSet.add(y));
+      }
+    });
+
+    const sortedYears = Array.from(yearsSet).sort();
+    if (sortedYears.length === 0) return [];
+
+    let previousTotal = 0;
+    return sortedYears.map((year, idx) => {
+      const filteredYearHoldings = yearlyHoldings.filter(item => {
+        if (selectedCategoryFilter === 'ALL') return true;
+        const cat = item.category || (item.years[year] && item.years[year].category) || 'Ações';
+        return cat === selectedCategoryFilter;
+      });
+
+      let yearTotal = 0;
+      let activeInYearCount = 0;
+
+      filteredYearHoldings.forEach(item => {
+        const yData = item.years && item.years[year];
+        if (yData && yData.quantity > 0) {
+          yearTotal += (yData.value || 0);
+          activeInYearCount += 1;
+        }
+      });
+
+      yearTotal = parseFloat(yearTotal.toFixed(2));
+      const growth = idx === 0 ? 0 : (yearTotal - previousTotal);
+      const growthPercent = (idx > 0 && previousTotal > 0) ? ((growth / previousTotal) * 100) : 0;
+      previousTotal = yearTotal;
+
+      return {
+        year,
+        total: yearTotal,
+        assetsCount: activeInYearCount,
+        growth: parseFloat(growth.toFixed(2)),
+        growthPercent: parseFloat(growthPercent.toFixed(1))
+      };
+    });
+  }, [yearlyHoldings, selectedCategoryFilter, activeHoldings, totalInvestedFiltered, filteredHoldings]);
+
+  // Evolution summary metrics
+  const evolutionSummary = useMemo(() => {
+    if (yearlyEvolutionData.length === 0) {
+      return { firstYear: '-', lastYear: '-', totalGrowth: 0, growthPercent: 0 };
+    }
+    const first = yearlyEvolutionData[0];
+    const last = yearlyEvolutionData[yearlyEvolutionData.length - 1];
+    const totalGrowth = last.total - first.total;
+    const growthPercent = first.total > 0 ? ((totalGrowth / first.total) * 100) : 0;
+
+    return {
+      firstYear: first.year,
+      lastYear: last.year,
+      totalGrowth,
+      growthPercent: growthPercent.toFixed(1)
+    };
+  }, [yearlyEvolutionData]);
+
+  // Top 5 Positions for Bar Chart (Filtered or Global)
   const barData = useMemo(() => {
     return [...filteredHoldings]
       .sort((a, b) => (b.total_invested || 0) - (a.total_invested || 0))
-      .slice(0, 10)
+      .slice(0, 5)
       .map((h, idx) => ({
         name: h.ticker,
         Valor: parseFloat((h.total_invested || 0).toFixed(2)),
@@ -283,7 +584,7 @@ export default function DashboardView({
       }));
   }, [filteredHoldings, categoryColors, totalInvestedGlobal]);
 
-  // Format Y Axis for Bar Chart
+  // Format Y Axis for Bar and Line Charts
   const formatYAxis = (val) => {
     if (isPrivate) return '•••';
     if (val >= 1000000) return `R$${(val / 1000000).toFixed(1)}M`;
@@ -307,8 +608,6 @@ export default function DashboardView({
 
   return (
     <div className="space-y-7 animate-fade-in pb-12">
-      {/* Top Header & Actions */}
-
       {/* 4 Real KPIs (Icon on Left, Text beside it) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Patrimônio Alocado */}
@@ -322,10 +621,6 @@ export default function DashboardView({
               : `${filteredHoldings.length} ativo(s) nesta classe`
           }
           iconColor="#818cf8"
-          iconBg="rgba(99, 102, 241, 0.15)"
-          glowColor="#6366f1"
-          badge="Custo IRPF"
-          badgeColor="#818cf8"
         />
 
         {/* KPI 2: Custo Médio & Aquisição */}
@@ -335,10 +630,6 @@ export default function DashboardView({
           value={formatCurrency(totalInvestedFiltered, false, isPrivate)}
           subtext="Base legal para ganho de capital"
           iconColor="#34d399"
-          iconBg="rgba(16, 185, 129, 0.15)"
-          glowColor="#10b981"
-          badge="Declaratório"
-          badgeColor="#34d399"
         />
 
         {/* KPI 3: Classes & Diversificação */}
@@ -356,10 +647,6 @@ export default function DashboardView({
               : `Alocação em ${selectedCategoryFilter}`
           }
           iconColor="#38bdf8"
-          iconBg="rgba(6, 182, 212, 0.15)"
-          glowColor="#06b6d4"
-          badge="Alocação"
-          badgeColor="#38bdf8"
         />
 
         {/* KPI 4: Conformidade Fiscal */}
@@ -369,13 +656,10 @@ export default function DashboardView({
           value={inconsistencies.length === 0 ? "100% Regular" : `${inconsistencies.length} pendência${inconsistencies.length > 1 ? 's' : ''}`}
           subtext={inconsistencies.length === 0 ? "Histórico sem divergências" : "Revisão necessária"}
           iconColor={inconsistencies.length === 0 ? "#34d399" : "#fbbf24"}
-          iconBg={inconsistencies.length === 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)"}
-          glowColor={inconsistencies.length === 0 ? "#10b981" : "#f59e0b"}
-          badge="Auditoria"
-          badgeColor={inconsistencies.length === 0 ? "#34d399" : "#fbbf24"}
         />
       </div>
 
+      {/* Filter Bar & Quick Refresh */}
       <div className="flex items-center justify-between gap-2.5">
         {/* Category Pills Filter Bar */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-none">
@@ -435,139 +719,65 @@ export default function DashboardView({
         </button>
       </div>
 
+      {/* Main Charts Grid: 4/6 (Left: Evolution) & 2/6 (Right: Allocation + Top 5) */}
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
 
-      {/* Main Charts Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-
-        {/* Donut Chart: Alocação por Categoria */}
-        <div className="glass-panel rounded-3xl p-6 xl:col-span-2 flex flex-col justify-between relative overflow-hidden">
+        {/* LEFT COLUMN (4 of 6): Evolução do Patrimônio Ano a Ano */}
+        <div className="lg:col-span-4 glass-panel rounded-3xl p-6 flex flex-col justify-between relative overflow-hidden">
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400">
-                  <PieIcon className="w-4 h-4" />
+            {/* Header with Title and Growth Stats */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-md">
+                  <History className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Alocação por Categoria</h3>
-                  <p className="text-[11px] text-zinc-400">Divisão percentual da carteira</p>
-                </div>
-              </div>
-              <span className="text-[10px] px-2.5 py-1 rounded-full bg-white/5 text-zinc-300 font-bold">
-                {categorySummary.length} classes
-              </span>
-            </div>
-
-            {pieData.length === 0 ? (
-              <div className="h-64 flex flex-col items-center justify-center text-zinc-500 text-xs text-center p-6">
-                <Layers className="w-8 h-8 text-zinc-600 mb-2 stroke-[1.5]" />
-                <p className="font-semibold">Nenhuma posição alocada</p>
-                <p className="text-[11px] text-zinc-600 mt-0.5">Cadastre compras para ver a divisão.</p>
-              </div>
-            ) : (
-              <>
-                <div className="h-64 w-full relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius="58%"
-                        outerRadius="82%"
-                        paddingAngle={3}
-                        dataKey="value"
-                        stroke="rgba(0,0,0,0.5)"
-                        strokeWidth={2}
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<ChartTooltip isPrivate={isPrivate} />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-
-                  {/* Donut Center Label */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                      Total
-                    </span>
-                    <span className="text-sm font-black text-white tabular-nums">
-                      {formatCurrency(totalInvestedGlobal, true, isPrivate)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Categorized Harmonious Legend Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4 pt-4 border-t border-white/5">
-                  {pieData.map((entry) => (
-                    <button
-                      key={entry.name}
-                      onClick={() => setSelectedCategoryFilter(selectedCategoryFilter === entry.name ? 'ALL' : entry.name)}
-                      className={`flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${selectedCategoryFilter === entry.name
-                        ? 'bg-white/10 border-white/20 shadow-md'
-                        : 'bg-white/[0.02] border-white/[0.03] hover:bg-white/[0.05]'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: entry.color, boxShadow: `0 0 6px ${entry.color}66` }}
-                        />
-                        <span className="text-xs font-bold text-zinc-200 truncate">
-                          {entry.name}
-                        </span>
-                      </div>
-                      <div className="text-right flex-shrink-0 pl-2">
-                        <span className="text-xs font-extrabold text-white tabular-nums">
-                          {(entry.percent * 100).toFixed(1)}%
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Bar Chart: Top 10 Maiores Posições */}
-        <div className="glass-panel rounded-3xl p-6 xl:col-span-3 flex flex-col justify-between relative overflow-hidden">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                  <BarChart3 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">
-                    Maiores Posições {selectedCategoryFilter !== 'ALL' ? `(${selectedCategoryFilter})` : '(Top 10)'}
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    Evolução do Patrimônio
+                    {selectedCategoryFilter !== 'ALL' && (
+                      <span className="text-[11px] font-semibold text-indigo-300 px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30">
+                        {selectedCategoryFilter}
+                      </span>
+                    )}
                   </h3>
-                  <p className="text-[11px] text-zinc-400">Ativos com maior capital investido</p>
+                  <p className="text-[11px] text-zinc-400">Histórico de acumulação por ano (custo de aquisição)</p>
                 </div>
               </div>
-              <span className="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 font-bold border border-emerald-500/20">
-                Por Custo
-              </span>
+
+              {yearlyEvolutionData.length > 1 && (
+                <div className="flex items-center gap-2 bg-white/[0.02] border border-white/5 px-3 py-1.5 rounded-2xl">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400">Período {evolutionSummary.firstYear} - {evolutionSummary.lastYear}:</span>
+                  <span className={`text-xs font-black flex items-center gap-0.5 ${evolutionSummary.totalGrowth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                    {evolutionSummary.totalGrowth >= 0 ? '+' : ''}{evolutionSummary.growthPercent}%
+                  </span>
+                </div>
+              )}
             </div>
 
-            {barData.length === 0 ? (
-              <div className="h-72 flex flex-col items-center justify-center text-zinc-500 text-xs text-center p-6">
-                <Layers className="w-8 h-8 text-zinc-600 mb-2 stroke-[1.5]" />
-                <p className="font-semibold">Nenhum ativo encontrado nesta seleção</p>
-                <p className="text-[11px] text-zinc-600 mt-0.5">Experimente selecionar outra categoria.</p>
+            {/* Line / Area Chart */}
+            {yearlyEvolutionData.length === 0 ? (
+              <div className="h-80 flex flex-col items-center justify-center text-zinc-500 text-xs text-center p-6">
+                <Calendar className="w-8 h-8 text-zinc-600 mb-2 stroke-[1.5]" />
+                <p className="font-semibold">Nenhum histórico anual disponível</p>
+                <p className="text-[11px] text-zinc-600 mt-0.5">Cadastre transações para visualizar o gráfico de acumulação.</p>
               </div>
             ) : (
-              <div className="h-80 w-full pt-2">
+              <div className="h-80 sm:h-96 w-full pt-4">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={barData}
-                    margin={{ top: 24, right: 12, left: 0, bottom: 6 }}
-                    barCategoryGap="24%"
+                  <AreaChart
+                    data={yearlyEvolutionData}
+                    margin={{ top: 20, right: 20, left: 0, bottom: 10 }}
                   >
+                    <defs>
+                      <linearGradient id="patrimonioGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.45} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                     <XAxis
-                      dataKey="name"
+                      dataKey="year"
                       tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }}
                       axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
                       tickLine={false}
@@ -577,29 +787,152 @@ export default function DashboardView({
                       tick={{ fill: '#64748b', fontSize: 10, fontWeight: 600 }}
                       axisLine={false}
                       tickLine={false}
-                      width={56}
+                      width={64}
                     />
-                    <Tooltip content={<ChartTooltip isPrivate={isPrivate} />} />
-                    <Bar
-                      dataKey="Valor"
-                      radius={[8, 8, 2, 2]}
-                      maxBarSize={48}
-                    >
-                      {barData.map((entry, index) => (
-                        <Cell key={`bar-${index}`} fill={entry.color} />
-                      ))}
-                      <LabelList
-                        dataKey="Valor"
-                        position="top"
-                        style={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }}
-                        formatter={(v) => isPrivate ? '•••' : (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(0))}
-                      />
-                    </Bar>
-                  </BarChart>
+                    <Tooltip content={<EvolutionTooltip isPrivate={isPrivate} />} />
+                    <Area
+                      type="monotone"
+                      dataKey="total"
+                      stroke="#818cf8"
+                      strokeWidth={3}
+                      fillOpacity={1}
+                      fill="url(#patrimonioGradient)"
+                      dot={{ r: 5, fill: '#818cf8', stroke: '#07070d', strokeWidth: 2 }}
+                      activeDot={{ r: 7, fill: '#38bdf8', stroke: '#ffffff', strokeWidth: 2 }}
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             )}
           </div>
+
+          {/* Bottom stats summary footer */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-white/5 text-xs">
+            <div className="p-2.5 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
+              <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">Acumulado Atual</span>
+              <span className="text-sm font-black text-white mt-0.5 block">
+                {formatCurrency(totalInvestedFiltered, false, isPrivate)}
+              </span>
+            </div>
+            <div className="p-2.5 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
+              <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">Anos Registrados</span>
+              <span className="text-sm font-black text-indigo-300 mt-0.5 block">
+                {yearlyEvolutionData.length} {yearlyEvolutionData.length === 1 ? 'ano' : 'anos fiscais'}
+              </span>
+            </div>
+            <div className="p-2.5 rounded-2xl bg-white/[0.02] border border-white/[0.04] col-span-2 sm:col-span-1">
+              <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">Ativos Atuais</span>
+              <span className="text-sm font-black text-emerald-400 mt-0.5 block">
+                {filteredHoldings.length} posições abertas
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN (2 of 6): Alocação por Categoria (Topo) & Top 5 Posições (Abaixo) */}
+        <div className="lg:col-span-2 flex flex-col gap-6">
+
+          {/* Card 1: Donut Chart - Alocação por Categoria */}
+          <div className="glass-panel rounded-3xl p-6 flex flex-col justify-between relative overflow-hidden flex-1">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                    <PieIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Alocação por Categoria</h3>
+                    <p className="text-[11px] text-zinc-400">Divisão percentual da carteira</p>
+                  </div>
+                </div>
+                <span className="text-[10px] px-2.5 py-1 rounded-full bg-white/5 text-zinc-300 font-bold">
+                  {categorySummary.length} classes
+                </span>
+              </div>
+
+              <AllocationDonut
+                data={pieData}
+                totalValue={totalInvestedGlobal}
+                isPrivate={isPrivate}
+                selectedCategory={selectedCategoryFilter}
+                onSelectCategory={setSelectedCategoryFilter}
+              />
+            </div>
+          </div>
+
+          {/* Card 2: Bar Chart - Maiores Posições (Top 5) */}
+          <div className="glass-panel rounded-3xl p-6 flex flex-col justify-between relative overflow-hidden flex-1">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                    <BarChart3 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">
+                      Maiores Posições {selectedCategoryFilter !== 'ALL' ? `(${selectedCategoryFilter})` : '(Top 5)'}
+                    </h3>
+                    <p className="text-[11px] text-zinc-400">Ativos com maior capital investido</p>
+                  </div>
+                </div>
+                <span className="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 font-bold border border-emerald-500/20">
+                  Por Custo
+                </span>
+              </div>
+
+              {barData.length === 0 ? (
+                <div className="h-56 flex flex-col items-center justify-center text-zinc-500 text-xs text-center p-6">
+                  <Layers className="w-8 h-8 text-zinc-600 mb-2 stroke-[1.5]" />
+                  <p className="font-semibold">Nenhum ativo encontrado</p>
+                </div>
+              ) : (
+                <div className="h-60 w-full pt-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={barData}
+                      margin={{ top: 20, right: 8, left: -10, bottom: 4 }}
+                      barCategoryGap="22%"
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }}
+                        axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tickFormatter={formatYAxis}
+                        tick={{ fill: '#64748b', fontSize: 9, fontWeight: 600 }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={48}
+                      />
+                      <Tooltip
+                        cursor={{ fill: 'rgba(255, 255, 255, 0.04)', radius: 6 }}
+                        content={<ChartTooltip isPrivate={isPrivate} />}
+                      />
+                      <Bar
+                        dataKey="Valor"
+                        radius={[8, 8, 2, 2]}
+                        maxBarSize={40}
+                      >
+                        {barData.map((entry, index) => (
+                          <Cell key={`bar-${index}`} fill={entry.color} />
+                        ))}
+                        <LabelList
+                          dataKey="Valor"
+                          position="top"
+                          style={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+                          formatter={(v) => isPrivate ? '•••' : (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(0))}
+                        />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -740,3 +1073,4 @@ export default function DashboardView({
     </div>
   );
 }
+
