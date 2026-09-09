@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Label,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList,
@@ -572,6 +572,7 @@ export default function DashboardView({
   const [monthlyEvolutionData, setMonthlyEvolutionData] = useState([]);
   const [isLoadingMonthly, setIsLoadingMonthly] = useState(false);
   const [monthlyLoadError, setMonthlyLoadError] = useState('');
+  const monthlyCacheRef = useRef(new Map());
 
   const loadData = async (showFeedback = false) => {
     if (showFeedback) setIsRefreshing(true);
@@ -741,10 +742,55 @@ export default function DashboardView({
     });
   }, [yearlyHoldings, selectedCategoryFilter, activeHoldings, totalInvestedFiltered, filteredHoldings]);
 
+  // Pre-fetch / cache all years monthly data in background for zero-latency zoom
+  useEffect(() => {
+    if (!yearlyHoldings || yearlyHoldings.length === 0) return;
+
+    const yearsSet = new Set();
+    yearlyHoldings.forEach(item => {
+      if (item.years) {
+        Object.keys(item.years).forEach(y => yearsSet.add(y));
+      }
+    });
+
+    yearsSet.forEach(async (year) => {
+      const cacheKey = `${year}_${selectedCategoryFilter}`;
+      if (monthlyCacheRef.current.has(cacheKey)) return;
+
+      const embedded = extractEmbeddedMonthlyData(yearlyHoldings, year, selectedCategoryFilter);
+      if (embedded.length) {
+        monthlyCacheRef.current.set(cacheKey, embedded);
+        return;
+      }
+
+      try {
+        const response = await fetchWithAuth(
+          `/api/monthly-holdings?year=${encodeURIComponent(year)}${selectedCategoryFilter !== 'ALL' ? `&category=${encodeURIComponent(selectedCategoryFilter)}` : ''}`
+        );
+        if (response.ok) {
+          const payload = await response.json();
+          const normalized = normalizeMonthlyResponse(payload, year, selectedCategoryFilter);
+          if (normalized.length) {
+            monthlyCacheRef.current.set(cacheKey, normalized);
+          }
+        }
+      } catch (e) {
+        // quiet prefetch fail
+      }
+    });
+  }, [yearlyHoldings, selectedCategoryFilter]);
+
   useEffect(() => {
     if (!selectedEvolutionYear) {
       setMonthlyEvolutionData([]);
       setMonthlyLoadError('');
+      setIsLoadingMonthly(false);
+      return;
+    }
+
+    const cacheKey = `${selectedEvolutionYear}_${selectedCategoryFilter}`;
+    if (monthlyCacheRef.current.has(cacheKey)) {
+      setMonthlyEvolutionData(monthlyCacheRef.current.get(cacheKey));
       setIsLoadingMonthly(false);
       return;
     }
@@ -762,6 +808,7 @@ export default function DashboardView({
       );
 
       if (embedded.length) {
+        monthlyCacheRef.current.set(cacheKey, embedded);
         if (!cancelled) {
           setMonthlyEvolutionData(embedded);
           setIsLoadingMonthly(false);
@@ -782,6 +829,9 @@ export default function DashboardView({
         const normalized = normalizeMonthlyResponse(payload, selectedEvolutionYear, selectedCategoryFilter);
 
         if (!cancelled) {
+          if (normalized.length) {
+            monthlyCacheRef.current.set(cacheKey, normalized);
+          }
           setMonthlyEvolutionData(normalized);
           setMonthlyLoadError(
             normalized.length
@@ -813,7 +863,12 @@ export default function DashboardView({
 
     const year = chartState?.activePayload?.[0]?.payload?.year ?? chartState?.activeLabel;
     if (year) {
-      setSelectedEvolutionYear(String(year));
+      const yearStr = String(year);
+      const cacheKey = `${yearStr}_${selectedCategoryFilter}`;
+      if (monthlyCacheRef.current.has(cacheKey)) {
+        setMonthlyEvolutionData(monthlyCacheRef.current.get(cacheKey));
+      }
+      setSelectedEvolutionYear(yearStr);
     }
   };
 
@@ -968,13 +1023,14 @@ export default function DashboardView({
                 <button
                   type="button"
                   onClick={closeMonthlyEvolution}
-                  className="theme-control flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold"
+                  className="theme-control flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold cursor-pointer"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
                   Voltar para anos
                 </button>
-                <span className="chart-badge rounded-lg px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide">
+                <span className="chart-badge flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide">
                   {selectedEvolutionYear} · mensal
+                  {isLoadingMonthly && <RefreshCw className="h-3 w-3 animate-spin text-indigo-400" />}
                 </span>
               </div>
             ) : yearlyEvolutionData.length > 1 ? (
@@ -990,20 +1046,7 @@ export default function DashboardView({
             ) : null}
           </div>
 
-          {selectedEvolutionYear && isLoadingMonthly ? (
-            <div className="flex min-h-[360px] flex-1 flex-col items-center justify-center gap-2 text-xs text-zinc-500">
-              <RefreshCw className="h-5 w-5 animate-spin text-indigo-400" />
-              <span className="font-semibold">Carregando histórico mensal de {selectedEvolutionYear}...</span>
-            </div>
-          ) : selectedEvolutionYear && activeEvolutionData.length === 0 ? (
-            <div className="flex min-h-[360px] flex-1 flex-col items-center justify-center p-8 text-center text-xs text-zinc-500">
-              <Calendar className="mb-2 h-8 w-8 text-zinc-600 stroke-[1.5]" />
-              <p className="font-semibold text-zinc-300">Ainda não há dados mensais para {selectedEvolutionYear}</p>
-              <p className="mt-1 max-w-md text-[11px] leading-5 text-zinc-500">
-                {monthlyLoadError || 'Assim que o histórico mensal estiver disponível, ele será exibido aqui.'}
-              </p>
-            </div>
-          ) : yearlyEvolutionData.length === 0 ? (
+          {yearlyEvolutionData.length === 0 ? (
             <div className="flex min-h-[360px] flex-1 flex-col items-center justify-center p-6 text-center text-xs text-zinc-500">
               <Calendar className="mb-2 h-8 w-8 text-zinc-600 stroke-[1.5]" />
               <p className="font-semibold">Nenhum histórico anual disponível</p>
@@ -1051,6 +1094,9 @@ export default function DashboardView({
                     strokeWidth={3}
                     fillOpacity={0}
                     fill="transparent"
+                    isAnimationActive={true}
+                    animationDuration={600}
+                    animationEasing="ease-in-out"
                     dot={{ r: 3.5, fill: CHART_COLOR, stroke: CHART_RING_GAP, strokeWidth: 2 }}
                     activeDot={{ r: 5, fill: CHART_COLOR, stroke: CHART_RING_GAP, strokeWidth: 2 }}
                   />
