@@ -185,6 +185,28 @@ input:autofill:active {
   background: var(--theme-text-subtle);
 }
 
+.chart-scroll-wrap {
+  scrollbar-width: thin;
+  scrollbar-color: var(--theme-border-strong) transparent;
+}
+
+.chart-scroll-wrap::-webkit-scrollbar {
+  height: 5px;
+}
+
+.chart-scroll-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chart-scroll-wrap::-webkit-scrollbar-thumb {
+  background: var(--theme-border-strong);
+  border-radius: 999px;
+}
+
+.chart-scroll-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-accent);
+}
+
 .kpi {
   position: relative;
   overflow: hidden;
@@ -195,6 +217,7 @@ input:autofill:active {
   transition: transform 160ms ease;
 
   & .icon {
+    transform: scale(1.20) rotate(0deg);
     transition: transform 160ms ease;
   }
 
@@ -202,7 +225,7 @@ input:autofill:active {
     transform: translateY(-2px);
 
     & .icon {
-      transform: scale(1.04) rotate(8deg);
+      transform: scale(1.24) rotate(8deg);
     }
   }
 }
@@ -400,6 +423,7 @@ input:autofill:active {
 }
 
 .workspace-nav {
+  position: relative;
   display: flex;
   min-height: 43px;
   align-items: flex-end;
@@ -421,40 +445,45 @@ input:autofill:active {
   gap: 7px;
   padding: 0 13px;
   border: 0;
-  background: transparent;
+  background: transparent !important;
   color: var(--theme-text-muted);
   font-size: 11px;
   font-weight: 750;
   white-space: nowrap;
   cursor: pointer;
-}
-
-.workspace-tab::after {
-  content: '';
-  position: absolute;
-  right: 12px;
-  bottom: 0;
-  left: 12px;
-  height: 2px;
-  border-radius: 999px 999px 0 0;
-  background: transparent;
+  opacity: 0.72;
+  transform: scale(1);
+  transition: transform 160ms ease, opacity 160ms ease;
 }
 
 .workspace-tab:hover {
+  opacity: 1;
   color: var(--theme-text);
-  background: var(--theme-surface-raised);
+  transform: scale(1.04);
+  background: transparent !important;
 }
 
 .workspace-tab-active {
-  color: var(--theme-accent);
+  opacity: 1;
+  color: var(--theme-accent) !important;
+  transform: scale(1.02);
+  background: transparent !important;
 }
 
-.workspace-tab-active::after {
+.workspace-tab-slider {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2.5px;
+  border-radius: 999px 999px 0 0;
   background: var(--theme-accent);
+  pointer-events: none;
+  transition: transform 260ms cubic-bezier(0.2, 0, 0, 1), width 260ms cubic-bezier(0.2, 0, 0, 1), opacity 180ms ease;
+  will-change: transform, width;
 }
 
 .workspace-page {
-  min-height: calc(100vh - 150px);
+  width: 100%;
 }
 
 .module-placeholder {

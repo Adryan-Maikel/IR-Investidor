@@ -75,7 +75,7 @@ export default function AuthView({ onLoginSuccess, setToast, theme, onToggleThem
               D
             </div>
             <div>
-              <p className="text-sm font-extrabold text-white">DeclarAtivo</p>
+              <p className="text-sm font-extrabold text-white">Declar<span className="text-[var(--theme-accent)]">Ativo</span></p>
               <p className="text-[11px] text-zinc-500">Gestão tributária para investidores</p>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   AlertTriangle,
   Award,
@@ -101,6 +101,30 @@ export default function App() {
   const [isPrivate, setIsPrivate] = useState(() => {
     return localStorage.getItem('declarativo_privacy') === 'true';
   });
+  const tabRefs = useRef({});
+  const [tabIndicator, setTabIndicator] = useState({ left: 0, width: 0, opacity: 0 });
+
+  useEffect(() => {
+    const updateIndicator = () => {
+      const activeEl = tabRefs.current[activeTab];
+      if (activeEl) {
+        setTabIndicator({
+          left: activeEl.offsetLeft + 10,
+          width: Math.max(0, activeEl.offsetWidth - 20),
+          opacity: 1,
+        });
+      }
+    };
+
+    updateIndicator();
+    const timer = setTimeout(updateIndicator, 50);
+
+    window.addEventListener('resize', updateIndicator);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updateIndicator);
+    };
+  }, [activeTab]);
 
   const togglePrivacy = () => {
     setIsPrivate((prev) => {
@@ -219,7 +243,7 @@ export default function App() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h1 className="truncate text-sm font-extrabold tracking-tight text-[var(--theme-text)] sm:text-base">
-                    DeclarAtivo
+                    Declar<span className="text-[var(--theme-accent)]">Ativo</span>
                   </h1>
                   <span className="version-badge rounded-md px-1.5 py-0.5 text-[9px] font-bold">
                     2.0
@@ -306,7 +330,7 @@ export default function App() {
         </div>
 
         <div className="workspace-nav-wrap">
-          <nav className="workspace-nav mx-auto w-full max-w-7xl" aria-label="Navegação principal">
+          <nav className="workspace-nav mx-auto w-full max-w-7xl relative" aria-label="Navegação principal">
             {WORKSPACE_TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -314,6 +338,7 @@ export default function App() {
               return (
                 <button
                   key={tab.id}
+                  ref={(el) => { tabRefs.current[tab.id] = el; }}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
                   className={`workspace-tab ${isActive ? 'workspace-tab-active' : ''}`}
@@ -325,11 +350,21 @@ export default function App() {
                 </button>
               );
             })}
+
+            {/* Sliding Underline Indicator Div */}
+            <div
+              className="workspace-tab-slider"
+              style={{
+                transform: `translateX(${tabIndicator.left}px)`,
+                width: `${tabIndicator.width}px`,
+                opacity: tabIndicator.opacity,
+              }}
+            />
           </nav>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-8 pt-5 sm:px-6 sm:pb-10 lg:px-8">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-6 pt-4 sm:px-6 sm:pb-8 lg:px-8">
         <div className="workspace-page">
           {activeTab === 'tab-dashboard' ? (
             <DashboardView

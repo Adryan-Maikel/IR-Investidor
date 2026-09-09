@@ -13,15 +13,14 @@ import {
   RefreshCw,
   PieChart as PieIcon,
   BarChart3,
-  Search,
   Receipt,
-  Copy,
-  Check,
-  Coins,
   History,
   ArrowUpRight,
   ArrowLeft,
-  Calendar
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  MoveHorizontal
 } from 'lucide-react';
 import { getCategoryColor, formatCurrency, formatNumber } from '../utils/categories';
 
@@ -331,7 +330,10 @@ function EvolutionTooltip({ active, payload, label, isPrivate, viewMode = 'year'
   if (!active || !payload || !payload.length) return null;
   const data = payload[0].payload;
   const isPositive = data.growth >= 0;
-  const title = viewMode === 'month' ? `${label} ${selectedYear}` : `Ano ${label}`;
+  const monthName = data.displayLabel || label;
+  const title = viewMode === 'month'
+    ? `${monthName} de ${data.year || selectedYear || ''}`
+    : `Ano ${label}`;
   const variationLabel = viewMode === 'month' ? 'Variação vs mês anterior:' : 'Variação vs anterior:';
 
   return (
@@ -566,8 +568,6 @@ export default function DashboardView({
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [copiedTicker, setCopiedTicker] = useState(null);
   const [selectedEvolutionYear, setSelectedEvolutionYear] = useState(null);
   const [monthlyEvolutionData, setMonthlyEvolutionData] = useState([]);
   const [isLoadingMonthly, setIsLoadingMonthly] = useState(false);
@@ -629,17 +629,12 @@ export default function DashboardView({
     return holdings.filter(h => h.quantity > 0);
   }, [holdings]);
 
-  // Holdings filtered by selected category filter and search query
+  // Holdings filtered by selected category filter
   const filteredHoldings = useMemo(() => {
     return activeHoldings.filter(h => {
-      const matchesCategory = selectedCategoryFilter === 'ALL' || (h.category || 'Ações') === selectedCategoryFilter;
-      const matchesSearch = !searchQuery.trim() ||
-        h.ticker.toUpperCase().includes(searchQuery.toUpperCase().trim()) ||
-        (h.name && h.name.toUpperCase().includes(searchQuery.toUpperCase().trim())) ||
-        (h.cnpj && h.cnpj.includes(searchQuery.trim()));
-      return matchesCategory && matchesSearch;
+      return selectedCategoryFilter === 'ALL' || (h.category || 'Ações') === selectedCategoryFilter;
     });
-  }, [activeHoldings, selectedCategoryFilter, searchQuery]);
+  }, [activeHoldings, selectedCategoryFilter]);
 
   // Aggregate totals
   const totalInvestedGlobal = useMemo(() => {
@@ -858,6 +853,105 @@ export default function DashboardView({
     };
   }, [selectedEvolutionYear, selectedCategoryFilter, yearlyHoldings]);
 
+  const availableYears = useMemo(() => {
+    return yearlyEvolutionData.map(y => y.year);
+  }, [yearlyEvolutionData]);
+
+  const currentYearIndex = useMemo(() => {
+    if (!selectedEvolutionYear) return -1;
+    return availableYears.indexOf(selectedEvolutionYear);
+  }, [availableYears, selectedEvolutionYear]);
+
+  const hasPrevYear = currentYearIndex > 0;
+  const hasNextYear = currentYearIndex >= 0 && currentYearIndex < availableYears.length - 1;
+  const prevYear = hasPrevYear ? availableYears[currentYearIndex - 1] : null;
+  const nextYear = hasNextYear ? availableYears[currentYearIndex + 1] : null;
+
+  const switchYear = (targetYear) => {
+    if (!targetYear || targetYear === selectedEvolutionYear) return;
+    const yearStr = String(targetYear);
+    const cacheKey = `${yearStr}_${selectedCategoryFilter}`;
+    if (monthlyCacheRef.current.has(cacheKey)) {
+      setMonthlyEvolutionData(monthlyCacheRef.current.get(cacheKey));
+    }
+    setSelectedEvolutionYear(yearStr);
+  };
+
+  // Lateral Drag / Pan with hand cursor
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartXRef = useRef(0);
+  const isDraggingRef = useRef(false);
+
+  const handleMouseDown = (e) => {
+    if (!selectedEvolutionYear) return;
+    isDraggingRef.current = true;
+    setIsDragging(true);
+    dragStartXRef.current = e.clientX;
+    setDragOffset(0);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDraggingRef.current || !selectedEvolutionYear) return;
+    const dx = e.clientX - dragStartXRef.current;
+    if ((dx > 0 && !hasPrevYear) || (dx < 0 && !hasNextYear)) {
+      setDragOffset(dx * 0.22);
+    } else {
+      setDragOffset(dx);
+    }
+  };
+
+  const handleMouseUp = () => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    setIsDragging(false);
+
+    if (dragOffset > 45 && hasPrevYear) {
+      switchYear(prevYear);
+    } else if (dragOffset < -45 && hasNextYear) {
+      switchYear(nextYear);
+    }
+    setDragOffset(0);
+  };
+
+  const handleMouseLeave = () => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    setIsDragging(false);
+    setDragOffset(0);
+  };
+
+  const handleTouchStart = (e) => {
+    if (!selectedEvolutionYear || !e.touches[0]) return;
+    isDraggingRef.current = true;
+    setIsDragging(true);
+    dragStartXRef.current = e.touches[0].clientX;
+    setDragOffset(0);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDraggingRef.current || !selectedEvolutionYear || !e.touches[0]) return;
+    const dx = e.touches[0].clientX - dragStartXRef.current;
+    if ((dx > 0 && !hasPrevYear) || (dx < 0 && !hasNextYear)) {
+      setDragOffset(dx * 0.22);
+    } else {
+      setDragOffset(dx);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    setIsDragging(false);
+
+    if (dragOffset > 45 && hasPrevYear) {
+      switchYear(prevYear);
+    } else if (dragOffset < -45 && hasNextYear) {
+      switchYear(nextYear);
+    }
+    setDragOffset(0);
+  };
+
   const handleEvolutionChartClick = (chartState) => {
     if (selectedEvolutionYear) return;
 
@@ -880,9 +974,6 @@ export default function DashboardView({
 
   const activeEvolutionData = selectedEvolutionYear ? monthlyEvolutionData : yearlyEvolutionData;
   const activeEvolutionDataKey = selectedEvolutionYear ? 'label' : 'year';
-  const activeEvolutionLast = activeEvolutionData.length
-    ? activeEvolutionData[activeEvolutionData.length - 1]
-    : null;
 
   // Evolution summary metrics
   const evolutionSummary = useMemo(() => {
@@ -919,46 +1010,67 @@ export default function DashboardView({
   // Format Y Axis for Bar and Line Charts
   const formatYAxis = (val) => {
     if (isPrivate) return '•••';
-    if (val >= 1000000) return `R$${(val / 1000000).toFixed(1)}M`;
-    if (val >= 1000) return `R$${(val / 1000).toFixed(0)}k`;
-    return `R$${val}`;
+    if (val >= 1000000) {
+      const formatted = (val / 1000000).toFixed(val % 1000000 === 0 ? 0 : 1);
+      return `R$${formatted}M`;
+    }
+    if (val >= 1000) {
+      const formatted = (val / 1000).toFixed(val % 1000 === 0 ? 0 : 1);
+      return `R$${formatted}k`;
+    }
+    return `R$${Math.round(val)}`;
   };
 
-  const handleCopyIR = (h) => {
-    const text = `${h.category || 'AÇÕES'} - ${h.ticker} (${h.name || h.razao_social || h.ticker}) - CNPJ: ${h.cnpj || 'N/A'}. QUANTIDADE: ${h.quantity} COTAS. CUSTO TOTAL: ${formatCurrency(h.total_invested, false, false)}. PREÇO MÉDIO: ${formatCurrency(h.average_price, false, false)}.`;
-    navigator.clipboard.writeText(text);
-    setCopiedTicker(h.ticker);
-    setTimeout(() => setCopiedTicker(null), 2000);
-    if (setToast) {
-      setToast({ message: `Descrição de ${h.ticker} copiada para declaração!`, type: 'success' });
+  // Dynamic Y-Axis Domain: in monthly mode, adjusts to [min, max] around respective values for expressive zoom; in yearly mode, starts from 0
+  const evolutionYDomain = useMemo(() => {
+    if (!activeEvolutionData || activeEvolutionData.length === 0) {
+      return ['auto', 'auto'];
     }
-  };
+    const values = activeEvolutionData
+      .map(d => (typeof d.total === 'number' ? d.total : Number(d.total)))
+      .filter(v => typeof v === 'number' && !isNaN(v) && v > 0);
+
+    if (values.length === 0) return [0, 'auto'];
+
+    const minVal = Math.min(...values);
+    const maxVal = Math.max(...values);
+
+    if (selectedEvolutionYear) {
+      const diff = maxVal - minVal;
+      const padding = diff > 0 ? diff * 0.18 : maxVal * 0.05;
+      const lower = Math.max(0, Math.floor(minVal - padding));
+      const upper = Math.ceil(maxVal + padding);
+      return [lower, upper];
+    }
+
+    return [0, Math.ceil(maxVal * 1.08)];
+  }, [activeEvolutionData, selectedEvolutionYear]);
 
   if (isLoading) {
     return <DashboardSkeleton />;
   }
 
   return (
-    <div className="space-y-7 animate-fade-in pb-12">
+    <div className="space-y-5 animate-fade-in">
       {/* 4 Real KPIs (Icon on Left, Text beside it) */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {/* KPI 1: Patrimônio Alocado */}
         <KpiCard
           icon={Wallet}
-          label={selectedCategoryFilter === 'ALL' ? "Patrimônio Total" : `Patrimônio em ${selectedCategoryFilter}`}
+          label="Patrimônio Alocado"
           value={formatCurrency(totalInvestedFiltered, false, isPrivate)}
           subtext={
             selectedCategoryFilter === 'ALL'
-              ? `${activeHoldings.length} ativos em custódia`
-              : `${filteredHoldings.length} ativo(s) nesta classe`
+              ? 'Posição consolidada'
+              : `Total em ${selectedCategoryFilter}`
           }
           iconColor="var(--theme-accent)"
         />
 
-        {/* KPI 2: Custo Médio & Aquisição */}
+        {/* KPI 2: Custo Total Declarado */}
         <KpiCard
           icon={Receipt}
-          label="Base de Aquisição"
+          label="Custo Total Declarado"
           value={formatCurrency(totalInvestedFiltered, false, isPrivate)}
           subtext="Base legal para ganho de capital"
           iconColor="var(--theme-accent)"
@@ -992,10 +1104,10 @@ export default function DashboardView({
       </div>
 
       {/* Main Charts Grid: line chart fills the tall column; side cards stay compact */}
-      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-6">
+      <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-6">
 
         {/* LEFT COLUMN: Evolução do Patrimônio */}
-        <div className="surface-panel relative flex min-h-[620px] flex-col overflow-hidden rounded-xl p-5 sm:p-6 lg:col-span-4">
+        <div className="surface-panel relative flex flex-1 flex-col overflow-hidden rounded-xl p-5 sm:p-6 lg:col-span-4">
           <div className="mb-3 flex shrink-0 flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div className="flex min-w-0 items-center gap-3">
               <div className="chart-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
@@ -1019,7 +1131,7 @@ export default function DashboardView({
             </div>
 
             {selectedEvolutionYear ? (
-              <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
+              <div className="flex shrink-0 flex-wrap items-center gap-2 self-start sm:self-auto">
                 <button
                   type="button"
                   onClick={closeMonthlyEvolution}
@@ -1028,9 +1140,39 @@ export default function DashboardView({
                   <ArrowLeft className="h-3.5 w-3.5" />
                   Voltar para anos
                 </button>
-                <span className="chart-badge flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide">
-                  {selectedEvolutionYear} · mensal
-                  {isLoadingMonthly && <RefreshCw className="h-3 w-3 animate-spin text-indigo-400" />}
+
+                <div className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950/60 p-0.5">
+                  <button
+                    type="button"
+                    disabled={!hasPrevYear}
+                    onClick={() => switchYear(prevYear)}
+                    className="flex h-7 items-center gap-1 rounded-md px-2 text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800/60 disabled:opacity-25 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
+                    title={hasPrevYear ? `Navegar para ${prevYear}` : undefined}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                    <span>{prevYear || ''}</span>
+                  </button>
+
+                  <span className="chart-badge flex h-7 items-center gap-1 rounded-md px-2.5 text-[10px] font-black uppercase tracking-wide">
+                    {selectedEvolutionYear} · mensal
+                    {isLoadingMonthly && <RefreshCw className="h-3 w-3 animate-spin text-indigo-400" />}
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled={!hasNextYear}
+                    onClick={() => switchYear(nextYear)}
+                    className="flex h-7 items-center gap-1 rounded-md px-2 text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800/60 disabled:opacity-25 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
+                    title={hasNextYear ? `Navegar para ${nextYear}` : undefined}
+                  >
+                    <span>{nextYear || ''}</span>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <span className="hidden items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950/40 px-2.5 py-1.5 text-[10px] font-semibold text-zinc-400 sm:flex">
+                  <MoveHorizontal className="h-3.5 w-3.5 text-indigo-400" />
+                  Arraste para navegar
                 </span>
               </div>
             ) : yearlyEvolutionData.length > 1 ? (
@@ -1047,98 +1189,86 @@ export default function DashboardView({
           </div>
 
           {yearlyEvolutionData.length === 0 ? (
-            <div className="flex min-h-[360px] flex-1 flex-col items-center justify-center p-6 text-center text-xs text-zinc-500">
+            <div className="flex min-h-[440px] flex-1 flex-col items-center justify-center p-6 text-center text-xs text-zinc-500">
               <Calendar className="mb-2 h-8 w-8 text-zinc-600 stroke-[1.5]" />
               <p className="font-semibold">Nenhum histórico anual disponível</p>
               <p className="mt-0.5 text-[11px] text-zinc-600">Cadastre transações para visualizar o gráfico de acumulação.</p>
             </div>
           ) : (
-            <div className={`chart-clean-focus min-h-[360px] w-full flex-1 pt-2 ${selectedEvolutionYear ? '' : 'cursor-pointer'}`}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={activeEvolutionData}
-                  margin={{ top: 14, right: 10, left: -4, bottom: 2 }}
-                  onClick={selectedEvolutionYear ? undefined : handleEvolutionChartClick}
-                  className="chart-clean-focus"
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
-                  <XAxis
-                    dataKey={activeEvolutionDataKey}
-                    tick={{ fill: CHART_AXIS, fontSize: 11, fontWeight: 700 }}
-                    axisLine={{ stroke: CHART_GRID }}
-                    tickLine={false}
-                    interval={selectedEvolutionYear ? 0 : 'preserveStartEnd'}
-                  />
-                  <YAxis
-                    tickFormatter={formatYAxis}
-                    tick={{ fill: CHART_AXIS, fontSize: 10, fontWeight: 600 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={60}
-                  />
-                  <Tooltip
-                    cursor={{ stroke: 'var(--theme-border-strong)', strokeWidth: 1, strokeDasharray: '4 4' }}
-                    content={(
-                      <EvolutionTooltip
-                        isPrivate={isPrivate}
-                        viewMode={selectedEvolutionYear ? 'month' : 'year'}
-                        selectedYear={selectedEvolutionYear}
-                      />
-                    )}
-                    wrapperStyle={{ outline: 'none' }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="total"
-                    stroke={CHART_COLOR}
-                    strokeWidth={3}
-                    fillOpacity={0}
-                    fill="transparent"
-                    isAnimationActive={true}
-                    animationDuration={600}
-                    animationEasing="ease-in-out"
-                    dot={{ r: 3.5, fill: CHART_COLOR, stroke: CHART_RING_GAP, strokeWidth: 2 }}
-                    activeDot={{ r: 5, fill: CHART_COLOR, stroke: CHART_RING_GAP, strokeWidth: 2 }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+            <div
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseLeave}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              className={`chart-clean-focus min-h-[440px] sm:min-h-[480px] w-full flex-1 pt-2 select-none ${
+                selectedEvolutionYear
+                  ? isDragging ? 'cursor-grabbing' : 'cursor-grab'
+                  : 'cursor-pointer'
+              }`}
+            >
+              <div
+                style={{
+                  transform: `translateX(${dragOffset}px)`,
+                  transition: isDragging ? 'none' : 'transform 260ms cubic-bezier(0.2, 0, 0, 1)',
+                  height: '100%',
+                  width: '100%'
+                }}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={activeEvolutionData}
+                    margin={{ top: 22, right: 24, left: -4, bottom: 2 }}
+                    onClick={selectedEvolutionYear ? undefined : handleEvolutionChartClick}
+                    className="chart-clean-focus"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
+                    <XAxis
+                      dataKey={activeEvolutionDataKey}
+                      tick={{ fill: CHART_AXIS, fontSize: 11, fontWeight: 700 }}
+                      axisLine={{ stroke: CHART_GRID }}
+                      tickLine={false}
+                      interval={selectedEvolutionYear ? 0 : 'preserveStartEnd'}
+                    />
+                    <YAxis
+                      domain={evolutionYDomain}
+                      tickFormatter={formatYAxis}
+                      tick={{ fill: CHART_AXIS, fontSize: 10, fontWeight: 600 }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={64}
+                    />
+                    <Tooltip
+                      cursor={{ stroke: 'var(--theme-border-strong)', strokeWidth: 1, strokeDasharray: '4 4' }}
+                      content={(
+                        <EvolutionTooltip
+                          isPrivate={isPrivate}
+                          viewMode={selectedEvolutionYear ? 'month' : 'year'}
+                          selectedYear={selectedEvolutionYear}
+                        />
+                      )}
+                      wrapperStyle={{ outline: 'none' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="total"
+                      stroke={CHART_COLOR}
+                      strokeWidth={3}
+                      fillOpacity={0}
+                      fill="transparent"
+                      isAnimationActive={true}
+                      animationDuration={600}
+                      animationEasing="ease-in-out"
+                      dot={{ r: 3.5, fill: CHART_COLOR, stroke: CHART_RING_GAP, strokeWidth: 2 }}
+                      activeDot={{ r: 5, fill: CHART_COLOR, stroke: CHART_RING_GAP, strokeWidth: 2 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           )}
-
-          <div className="mt-3 grid shrink-0 grid-cols-2 gap-2.5 border-t border-zinc-800 pt-3 text-xs sm:grid-cols-3">
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-2.5 py-2">
-              <span className="block text-[9px] font-bold uppercase tracking-wider text-zinc-400">
-                {selectedEvolutionYear ? 'Fechamento do período' : 'Acumulado atual'}
-              </span>
-              <span className="mt-0.5 block text-sm font-black text-white">
-                {formatCurrency(
-                  selectedEvolutionYear ? (activeEvolutionLast?.total || 0) : totalInvestedFiltered,
-                  false,
-                  isPrivate
-                )}
-              </span>
-            </div>
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-2.5 py-2">
-              <span className="block text-[9px] font-bold uppercase tracking-wider text-zinc-400">
-                {selectedEvolutionYear ? 'Meses registrados' : 'Anos registrados'}
-              </span>
-              <span className="mt-0.5 block text-sm font-black text-indigo-300">
-                {selectedEvolutionYear
-                  ? `${activeEvolutionData.length} ${activeEvolutionData.length === 1 ? 'mês' : 'meses'}`
-                  : `${yearlyEvolutionData.length} ${yearlyEvolutionData.length === 1 ? 'ano' : 'anos fiscais'}`}
-              </span>
-            </div>
-            <div className="col-span-2 rounded-lg border border-zinc-800 bg-zinc-950/40 px-2.5 py-2 sm:col-span-1">
-              <span className="block text-[9px] font-bold uppercase tracking-wider text-zinc-400">
-                {selectedEvolutionYear ? 'Ativos no fechamento' : 'Ativos atuais'}
-              </span>
-              <span className="mt-0.5 block text-sm font-black text-emerald-400">
-                {selectedEvolutionYear
-                  ? `${activeEvolutionLast?.assetsCount || 0} posições`
-                  : `${filteredHoldings.length} posições abertas`}
-              </span>
-            </div>
-          </div>
         </div>
 
         {/* RIGHT COLUMN: compact allocation + top positions */}
@@ -1234,141 +1364,6 @@ export default function DashboardView({
             )}
           </div>
         </div>
-      </div>
-
-      {/* Portfolio Grid & Watchlist 2.0 (Tabela Moderna de Posições) */}
-      <div className="surface-panel rounded-xl p-6 relative overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Coins className="w-5 h-5 text-indigo-400" />
-              Posições em Custódia
-            </h3>
-            <p className="text-[11px] text-zinc-400 mt-0.5">
-              Detalhamento de quantidade, preço médio e custo acumulado por ativo
-            </p>
-          </div>
-
-          {/* Search Input */}
-          <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por ticker, nome ou CNPJ..."
-              className="w-full pl-10 pr-4 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-        </div>
-
-        {filteredHoldings.length === 0 ? (
-          <div className="py-12 text-center text-zinc-500 text-xs">
-            Nenhum ativo encontrado para os filtros selecionados.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-zinc-800 text-[10px] font-black uppercase tracking-wider text-zinc-400">
-                  <th className="pb-3 px-3">Ativo</th>
-                  <th className="pb-3 px-3">Categoria</th>
-                  <th className="pb-3 px-3 text-right">Quantidade</th>
-                  <th className="pb-3 px-3 text-right">Preço Médio</th>
-                  <th className="pb-3 px-3 text-right">Total Investido</th>
-                  <th className="pb-3 px-3 text-right">Peso</th>
-                  <th className="pb-3 px-3 text-center">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.04]">
-                {filteredHoldings.map((h, idx) => {
-                  const color = getCategoryColor(h.category, categoryColors, idx);
-                  const weight = totalInvestedGlobal > 0 ? ((h.total_invested || 0) / totalInvestedGlobal) * 100 : 0;
-                  const isCopied = copiedTicker === h.ticker;
-
-                  return (
-                    <tr key={h.ticker} className="hover:bg-zinc-950/40 group">
-                      {/* Ativo */}
-                      <td className="py-3.5 px-3">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs text-white flex-shrink-0"
-                            style={{ backgroundColor: `${color}25`, border: `1px solid ${color}45` }}
-                          >
-                            {h.ticker.slice(0, 2)}
-                          </div>
-                          <div>
-                            <span className="font-extrabold text-white text-xs tracking-wide group-hover:text-indigo-300">
-                              {h.ticker}
-                            </span>
-                            <p className="text-[10px] text-zinc-400 truncate max-w-[140px] sm:max-w-[200px]">
-                              {h.name || h.razao_social || h.ticker}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Categoria */}
-                      <td className="py-3.5 px-3">
-                        <span
-                          className="px-2.5 py-1 rounded-full text-[10px] font-bold border"
-                          style={{
-                            backgroundColor: `${color}15`,
-                            color: color,
-                            borderColor: `${color}35`
-                          }}
-                        >
-                          {h.category || 'Ações'}
-                        </span>
-                      </td>
-
-                      {/* Quantidade */}
-                      <td className="py-3.5 px-3 text-right font-mono text-zinc-300">
-                        {formatNumber(h.quantity, 6, isPrivate)}
-                      </td>
-
-                      {/* Preço Médio */}
-                      <td className="py-3.5 px-3 text-right font-mono text-zinc-300">
-                        {formatCurrency(h.average_price, false, isPrivate)}
-                      </td>
-
-                      {/* Total Investido */}
-                      <td className="py-3.5 px-3 text-right font-mono font-bold text-white">
-                        {formatCurrency(h.total_invested, false, isPrivate)}
-                      </td>
-
-                      {/* Peso na Carteira */}
-                      <td className="py-3.5 px-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="w-16 h-1.5 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800 hidden sm:block">
-                            <div
-                              className="h-full rounded-full"
-                              style={{ width: `${Math.min(weight, 100)}%`, backgroundColor: color }}
-                            />
-                          </div>
-                          <span className="font-bold text-zinc-300 tabular-nums">
-                            {weight.toFixed(1)}%
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Ações */}
-                      <td className="py-3.5 px-3 text-center">
-                        <button
-                          onClick={() => handleCopyIR(h)}
-                          className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-950/40 hover:bg-zinc-800 text-zinc-400 hover:text-white cursor-pointer"
-                          title="Copiar texto formatado para IRPF"
-                        >
-                          {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
     </div>
   );
