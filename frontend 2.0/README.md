@@ -1,16 +1,67 @@
-# React + Vite
+# DeclarAtivo 2.0 — frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Interface React/Vite com tema claro/escuro e paleta centralizada por tokens CSS.
 
-Currently, two official plugins are available:
+## Navegação integrada
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+O antigo drawer lateral foi removido. Os módulos agora aparecem como uma barra de navegação horizontal logo abaixo do header:
 
-## React Compiler
+- Dashboard
+- Bens e Direitos
+- Transações
+- DARFs & Vendas
+- IR Mensal
+- FIIs & Fiagro
+- Configurações
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Ao selecionar uma opção, o conteúdo é renderizado na área de trabalho logo abaixo da barra. O Dashboard continua funcional; os demais módulos estão preparados como telas internas para receber suas implementações.
 
-## Expanding the Oxlint configuration
+## Sincronização
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+O botão textual `Sincronizar` foi removido do Dashboard. A ação agora fica no header como um botão compacto apenas com o ícone de atualização. Ele dispara o mesmo recarregamento de dados do Dashboard e mostra o feedback existente por toast.
+
+## Filtro de classes
+
+A barra `Todas as Classes / Ações / ...` foi removida. A seleção por categoria continua disponível diretamente pelo gráfico de rosca; o comando `Limpar filtro` aparece quando uma categoria estiver selecionada.
+
+## KPI
+
+A classe `.kpi` usa a versão ajustada pelo usuário:
+
+```css
+.kpi {
+  position: relative;
+  overflow: hidden;
+  padding: 10px 12px;
+  border-left: 4px solid var(--theme-accent);
+  border-radius: 14px;
+  background: var(--theme-kpi-bg);
+  transition: transform 160ms ease;
+}
+```
+
+Os estilos internos de ícone e hover permanecem aninhados, sem substituir essas propriedades.
+
+## Tema
+
+Os principais tokens estão em `src/index.css`, usando a paleta:
+
+- `#1E401D`
+- `#192618`
+- `#4D8C30`
+- `#F2F2F2`
+- `#0D0D0D`
+
+## Histórico mensal
+
+O drill-down anual/mensal continua consumindo:
+
+```text
+GET /api/monthly-holdings?year=2025
+```
+
+Com filtro opcional por categoria:
+
+```text
+GET /api/monthly-holdings?year=2025&category=Ações
+```

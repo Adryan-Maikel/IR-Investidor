@@ -3,8 +3,11 @@
 Rotas para obter posições consolidadas (Holdings) e posições anuais (Yearly Holdings).
 """
 
-from typing import List, Dict
-from fastapi import APIRouter, Depends
+import calendar
+from datetime import date
+from typing import List, Dict, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, get_current_user
@@ -237,4 +240,88 @@ def get_yearly_holdings(
             }
             
     return list(results.values())
+
+@router.get("/api/monthly-holdings")
+def get_monthly_holdings(
+    year: int,
+    category: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Calcula snapshots mensais reais da carteira pelo custo de aquisição.
+
+    Cada ponto representa a posição acumulada no último dia de cada mês,
+    aplicando as mesmas regras de compras, vendas e eventos corporativos
+    usadas em /api/holdings e /api/yearly-holdings.
+
+    Para o ano corrente, retorna somente até o mês atual. Anos encerrados
+    retornam janeiro a dezembro. O filtro opcional ``category`` usa a
+    categoria cadastrada nos metadados do ticker.
+    """
+    today = date.today()
+
+    if year < 1900 or year > today.year:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ano inválido. Informe um ano entre 1900 e {today.year}."
+        )
+
+    transactions = db.query(Transaction).filter(
+        Transaction.user_id == current_user.id
+    ).all()
+    tickers = db.query(Ticker).filter(Ticker.user_id == current_user.id).all()
+
+    tickers_metadata = {
+        t.code.upper(): {
+            "category": t.category,
+            "name": t.name,
+            "cnpj": t.cnpj,
+            "razao_social": t.razao_social or t.name
+        } for t in tickers
+    }
+
+    category_filter = category.strip() if category else None
+    category_filter_key = category_filter.casefold() if category_filter else None
+
+    last_month = today.month if year == today.year else 12
+    monthly_results = []
+
+    for month in range(1, last_month + 1):
+        last_day = calendar.monthrange(year, month)[1]
+        end_date = f"{year:04d}-{month:02d}-{last_day:02d}"
+
+        snapshot_transactions = [
+            tx for tx in transactions
+            if tx.date <= end_date
+        ]
+        holdings = calculate_holdings(snapshot_transactions, tickers_metadata)
+
+        active_holdings = []
+        for holding in holdings:
+            if holding.quantity <= 0:
+                continue
+
+            if category_filter_key and (
+                (holding.category or "").strip().casefold() != category_filter_key
+            ):
+                continue
+
+            active_holdings.append(holding)
+
+        total = round(
+            sum(h.total_invested or 0.0 for h in active_holdings),
+            2
+        )
+
+        monthly_results.append({
+            "year": year,
+            "month": month,
+            "date": end_date,
+            "total": total,
+            "assetsCount": len(active_holdings),
+            "category": category_filter if category_filter else "ALL"
+        })
+
+    return monthly_results
 
